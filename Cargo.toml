@@ -1,0 +1,10 @@
+[package]
+name = "utreexo"
+version = "0.1.0"
+authors = ["Devashish Dixit <devashishdxt@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+blake2b_simd = "0.5"
