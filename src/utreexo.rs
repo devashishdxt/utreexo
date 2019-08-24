@@ -57,6 +57,24 @@ impl Utreexo {
 
             self.0.push(new_tree);
         }
+
+        debug_assert!(
+            self.validate_leaf_distribution(),
+            "Invalid leaf distribution in utreexo"
+        );
+    }
+
+    /// Validates if leaves are correctly distributed in merkle forest
+    fn validate_leaf_distribution(&self) -> bool {
+        let leaf_distribution = leaf_distribution(self.leaves());
+
+        for (num_leaves, tree) in leaf_distribution.into_iter().zip(self.0.iter()) {
+            if num_leaves != tree.leaves() {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -120,8 +138,12 @@ mod tests {
     fn check_utreexo_array_creation() {
         let values = vec![b"hello"; 7];
 
-        let utreexo = Utreexo::new(&values);
+        let mut utreexo = Utreexo::new(&values);
         assert_eq!(3, utreexo.trees());
         assert_eq!(7, utreexo.leaves());
+
+        utreexo.insert(b"hello");
+        assert_eq!(1, utreexo.trees());
+        assert_eq!(8, utreexo.leaves());
     }
 }

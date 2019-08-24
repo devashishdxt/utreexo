@@ -71,7 +71,11 @@ impl BalancedMerkleTree {
         }
 
         // After hashing for all the heights, hashes `Vec` should be full
-        assert_eq!(hashes.capacity(), hashes.len());
+        debug_assert_eq!(
+            hashes.capacity(),
+            hashes.len(),
+            "Hashes are not filled completely while creating a balanced merkle tree"
+        );
 
         Some(BalancedMerkleTree(hashes))
     }
@@ -130,8 +134,16 @@ impl BalancedMerkleTree {
         }
 
         // After splitting is complete, both halves' `Vec` should be full
-        assert_eq!(first_half.len(), first_half.capacity());
-        assert_eq!(second_half.len(), second_half.capacity());
+        debug_assert_eq!(
+            first_half.len(),
+            first_half.capacity(),
+            "First half is not filled completely while splitting a merkle tree"
+        );
+        debug_assert_eq!(
+            second_half.len(),
+            second_half.capacity(),
+            "Second half is not filled completely while splitting a merkle tree"
+        );
 
         (
             BalancedMerkleTree(first_half),
@@ -186,6 +198,13 @@ impl BalancedMerkleTree {
         state.update(hashes[hashes.len() - 1].as_ref());
 
         hashes.push(state.finalize());
+
+        // After hashing for all the heights, hashes `Vec` should be full
+        debug_assert_eq!(
+            hashes.capacity(),
+            hashes.len(),
+            "Hashes are not filled completely while merging two balanced merkle trees"
+        );
 
         BalancedMerkleTree(hashes)
     }
