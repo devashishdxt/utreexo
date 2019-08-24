@@ -12,6 +12,18 @@ const MAX_ALLOWED_LEAVES: usize = usize::max_value() / 2;
 pub struct BalancedMerkleTree(Vec<Blake2Hash>);
 
 impl BalancedMerkleTree {
+    /// Creates a new balance merkle tree with a single leaf node
+    pub fn new_single<T: AsRef<[u8]>>(leaf: &T) -> Self {
+        let mut state = State::new();
+
+        // Add `0` byte to leaf nodes to prevent second preimage attack
+        // https://en.wikipedia.org/wiki/Merkle_tree#Second_preimage_attack
+        state.update(&[0]);
+        state.update(leaf.as_ref());
+
+        Self(vec![state.finalize()])
+    }
+
     /// Creates a new balanced merkle tree with given leaves. Returns `None` if number of leaves is not a power of two
     pub fn new<T: AsRef<[u8]>>(leaves: &[T]) -> Option<Self> {
         if !leaves.len().is_power_of_two() || leaves.len() > MAX_ALLOWED_LEAVES {
@@ -86,7 +98,7 @@ impl BalancedMerkleTree {
     ///
     /// # Panics
     ///
-    /// This function panics if current merkle tree cannot be split further, i.e.,  it only has one leaf
+    /// This function panics if current merkle tree cannot be split further, i.e., it only has one leaf
     pub fn split(self) -> (BalancedMerkleTree, BalancedMerkleTree) {
         let length = self.leaves();
 
@@ -200,7 +212,7 @@ mod tests {
 
         let root_hash = inputs.iter().map(leaf_hash).collect::<Vec<Blake2Hash>>()[0];
 
-        let tree = BalancedMerkleTree::new(&inputs).unwrap();
+        let tree = BalancedMerkleTree::new_single(&inputs[0]);
 
         assert_eq!(Hash(*root_hash.as_array()), tree.root_hash());
         assert_eq!(1, tree.leaves());

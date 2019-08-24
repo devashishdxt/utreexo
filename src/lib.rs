@@ -5,6 +5,8 @@
 
 mod balanced_merkle_tree;
 mod hash;
+mod utreexo;
 
-pub use balanced_merkle_tree::BalancedMerkleTree;
-pub use hash::Hash;
+pub use self::balanced_merkle_tree::BalancedMerkleTree;
+pub use self::hash::Hash;
+pub use self::utreexo::Utreexo;
