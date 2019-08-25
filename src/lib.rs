@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs, unstable_features)]
-#![no_std]
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
 
 //! # Utreexo
 extern crate alloc;

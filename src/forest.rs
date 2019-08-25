@@ -169,9 +169,6 @@ fn num_nodes(num_leaves: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    // For initializing global memory allocator
-    extern crate std;
-
     use super::*;
 
     const NUM_TESTING_LEAVES: usize = 1024; // 2^10
