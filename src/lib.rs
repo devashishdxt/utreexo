@@ -8,6 +8,10 @@ extern crate alloc;
 mod forest;
 mod hash;
 mod path;
+mod proof;
+
+pub(crate) use self::path::{Direction, Path};
 
 pub use self::forest::Forest;
 pub use self::hash::Hash;
+pub use self::proof::Proof;

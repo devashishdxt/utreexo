@@ -1,17 +1,23 @@
-use core::iter::Iterator;
+use core::iter::{DoubleEndedIterator, Iterator};
 
 use bit_vec::{BitVec, Iter};
 
 /// Represents path in a merkle proof
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct Path(BitVec);
+pub struct Path(pub(crate) BitVec);
 
 impl Path {
     /// Returns height of path
     #[inline]
     pub fn height(&self) -> usize {
         self.0.len()
+    }
+
+    /// Returns the number of leaves in the tree of this path
+    #[inline]
+    pub fn leaves(&self) -> usize {
+        2usize.pow(self.height() as u32)
     }
 
     /// Returns an iterator over direction in path
@@ -41,6 +47,15 @@ impl From<bool> for Direction {
     }
 }
 
+impl From<Direction> for bool {
+    fn from(direction: Direction) -> bool {
+        match direction {
+            Direction::Left => true,
+            Direction::Right => false,
+        }
+    }
+}
+
 /// Iterator over directions in a path
 pub struct Directions<'a>(Iter<'a>);
 
@@ -50,5 +65,12 @@ impl<'a> Iterator for Directions<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(Into::into)
+    }
+}
+
+impl<'a> DoubleEndedIterator for Directions<'a> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back().map(Into::into)
     }
 }

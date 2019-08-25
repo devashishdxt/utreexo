@@ -5,7 +5,7 @@ use blake2b_simd::Hash as Blake2Hash;
 pub const HASH_SIZE: usize = 32;
 
 /// Represents a hash value
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Hash(pub(crate) [u8; HASH_SIZE]);
 
