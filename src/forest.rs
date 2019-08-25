@@ -1,10 +1,8 @@
-use alloc::{collections::BTreeMap, vec, vec::Vec};
-use core::iter::repeat;
+use alloc::{collections::BTreeMap, vec::Vec};
 
 use bit_vec::BitVec;
-use blake2b_simd::{many::update_many, Params, State};
 
-use crate::{hash::HASH_SIZE, Direction, Hash, Path};
+use crate::{hash_intermediate, hash_leaf, hash_many_leaves, Direction, Hash, Path, Proof};
 
 /// Implementation of a merkle forest
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -40,19 +38,10 @@ impl Forest {
 
     /// Inserts a new value in forest
     pub fn insert<T: AsRef<[u8]>>(&mut self, value: T) {
-        let mut params = Params::default();
-        params.hash_length(HASH_SIZE);
+        // Calculate hash of `value`
+        let hash = hash_leaf(value);
 
-        let mut state = params.to_state();
-
-        // Add `0` byte to leaf nodes to prevent second preimage attack
-        // https://en.wikipedia.org/wiki/Merkle_tree#Second_preimage_attack
-        state.update(&[0]);
-        state.update(value.as_ref());
-
-        // Push hash into forest and run compression
-        let hash = state.finalize().into();
-
+        // Insert hash in forest if it does not already exists and run compression
         if !self.paths.contains_key(&hash) {
             self.forest.push(hash);
             self.leaves += 1;
@@ -64,23 +53,118 @@ impl Forest {
 
     /// Batch inserts new values in forest
     pub fn extend<T: AsRef<[u8]>>(&mut self, values: &[T]) {
-        let mut params = Params::default();
-        params.hash_length(HASH_SIZE);
-
-        let mut states = vec![params.to_state(); values.len()];
-
-        // Add `0` byte to leaf nodes to prevent second preimage attack
-        // https://en.wikipedia.org/wiki/Merkle_tree#Second_preimage_attack
-        update_many(states.iter_mut().zip(repeat(&[0]).take(values.len())));
-        update_many(states.iter_mut().zip(values.iter()));
-
-        for hash in states.iter().map(State::finalize).map(Into::into) {
+        for hash in hash_many_leaves(values) {
             if !self.paths.contains_key(&hash) {
                 self.forest.push(hash);
                 self.leaves += 1;
                 self.leaf_distribution.push(1);
 
                 self.compress();
+            }
+        }
+    }
+
+    /// Generates inclusion proof of given leaf value
+    pub fn prove<T: AsRef<[u8]>>(&self, value: T) -> Option<Proof> {
+        // Get hash of value
+        let hash = hash_leaf(value);
+
+        // Get path of value from `paths` map
+        let path = self.paths.get(&hash)?.clone();
+
+        // Calculate number of leaves and height of tree of the path
+        let leaves = path.leaves();
+        let height = path.height();
+
+        // Find the index of tree with above height in leaf distribution
+        let index = self
+            .leaf_distribution
+            .binary_search_by(|p| p.cmp(&leaves).reverse())
+            .unwrap();
+
+        // Calculate the root index of tree with above height in forest
+        // (number of places to skip to reach the tree + number of nodes in the tree - 1)
+        let root_index = self
+            .leaf_distribution
+            .iter()
+            .take(index)
+            .map(|num_leaves| num_nodes(*num_leaves))
+            .sum::<usize>()
+            + num_nodes(leaves)
+            - 1;
+
+        let mut accumulating_index = 0;
+
+        // # Formulas
+        //
+        // Go to the right child:
+        //   right child index = root_index - ((2 * accumulator_index) + 1)
+        //   new accumulator index = (2 * accumulator_index) + 1
+        //
+        // Go to the left child:
+        //   left child index = root_index - ((2 * accumulator_index) + 2)
+        //   new accumulator index = (2 * accumulator_index) + 2
+
+        let mut sibling_hashes = Vec::with_capacity(height);
+
+        for direction in path.directions().rev() {
+            match direction {
+                Direction::Left => {
+                    // Add hash of right index to sibling hashes and move accumulator to left index
+                    sibling_hashes.push(self.forest[root_index - ((accumulating_index * 2) + 1)]);
+                    accumulating_index = (accumulating_index * 2) + 2;
+                }
+                Direction::Right => {
+                    // Add hash of left index to sibling hashes and move accumulator to right index
+                    sibling_hashes.push(self.forest[root_index - ((accumulating_index * 2) + 2)]);
+                    accumulating_index = (accumulating_index * 2) + 1;
+                }
+            }
+        }
+
+        let leaf_hash = self.forest[root_index - accumulating_index];
+
+        // Reverse sibling hashes because proof expects these hashes from bottom to top
+        sibling_hashes.reverse();
+
+        // Sibling hashes should be full
+        debug_assert_eq!(sibling_hashes.len(), sibling_hashes.capacity());
+
+        Some(Proof {
+            path,
+            leaf_hash,
+            sibling_hashes,
+        })
+    }
+
+    /// Verifies inclusion proof
+    pub fn verify(&self, proof: &Proof) -> bool {
+        // Calculate number of leaves in tree of given proof
+        let leaves = proof.leaves();
+
+        // Find the index of tree with above height in leaf distribution
+        let index = self
+            .leaf_distribution
+            .binary_search_by(|p| p.cmp(&leaves).reverse());
+
+        match index {
+            Err(_) => false,
+            Ok(index) => {
+                // Calculate the root index of tree with above height in forest
+                // (number of places to skip to reach the tree + number of nodes in the tree)
+                let root_index = self
+                    .leaf_distribution
+                    .iter()
+                    .take(index)
+                    .map(|num_leaves| num_nodes(*num_leaves))
+                    .sum::<usize>()
+                    + num_nodes(leaves)
+                    - 1;
+
+                let root_hash = self.forest[root_index];
+
+                // Verify proof with root hash
+                proof.verify(root_hash)
             }
         }
     }
@@ -135,18 +219,10 @@ impl Forest {
             }
 
             // Calculate new root and add it to hashes
-            let mut params = Params::default();
-            params.hash_length(HASH_SIZE);
-
-            let mut state = params.to_state();
-
-            // Add `1` byte to intermediate nodes to prevent second preimage attack
-            // https://en.wikipedia.org/wiki/Merkle_tree#Second_preimage_attack
-            state.update(&[1]);
-            state.update(hashes[hashes.len() - 2].as_ref());
-            state.update(hashes[hashes.len() - 1].as_ref());
-
-            hashes.push(state.finalize().into());
+            hashes.push(hash_intermediate(
+                &hashes[hashes.len() - 2],
+                &hashes[hashes.len() - 1],
+            ));
 
             // After hashing for all the heights, hashes `Vec` should be full
             debug_assert_eq!(
@@ -236,7 +312,7 @@ mod tests {
     const NUM_TESTING_LEAVES: usize = 1024; // 2^10
 
     #[test]
-    fn check_insertion() {
+    fn check_flow() {
         let mut inputs = Vec::default();
 
         let mut forest = Forest::default();
@@ -268,6 +344,10 @@ mod tests {
         batch_forest.extend(&inputs);
 
         assert_eq!(forest, batch_forest);
+        assert!(forest.prove(format!("hello")).is_none());
+
+        let proof = forest.prove(format!("hello512")).unwrap();
+        assert!(forest.verify(&proof))
     }
 
     /// Returns leaf distribution in merkle forest for given number of leaf values

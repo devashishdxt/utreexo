@@ -1,17 +1,15 @@
 use alloc::vec::Vec;
 
-use blake2b_simd::Params;
-
-use crate::{hash::HASH_SIZE, Direction, Hash, Path};
+use crate::{hash_intermediate, Direction, Hash, Path};
 
 /// Inclusion proof of a value in a merkle forest
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Proof {
     // Path is from leaf node to root node
-    path: Path,
-    leaf_hash: Hash,
+    pub(crate) path: Path,
+    pub(crate) leaf_hash: Hash,
     // Sibling hashes are from bottom to top
-    sibling_hashes: Vec<Hash>,
+    pub(crate) sibling_hashes: Vec<Hash>,
 }
 
 impl Proof {
@@ -39,27 +37,10 @@ impl Proof {
         let mut hash = self.leaf_hash;
 
         for step in path {
-            let mut params = Params::default();
-            params.hash_length(HASH_SIZE);
-
-            let mut state = params.to_state();
-
-            // Add `1` byte to intermediate nodes to prevent second preimage attack
-            // https://en.wikipedia.org/wiki/Merkle_tree#Second_preimage_attack
-            state.update(&[1]);
-
-            match step {
-                Direction::Left => {
-                    state.update(hash.as_ref());
-                    state.update(sibling_hashes.next().unwrap().as_ref());
-                }
-                Direction::Right => {
-                    state.update(sibling_hashes.next().unwrap().as_ref());
-                    state.update(hash.as_ref());
-                }
+            hash = match step {
+                Direction::Left => hash_intermediate(&hash, sibling_hashes.next().unwrap()),
+                Direction::Right => hash_intermediate(sibling_hashes.next().unwrap(), &hash),
             }
-
-            hash = state.finalize().into();
         }
 
         hash == root_hash
