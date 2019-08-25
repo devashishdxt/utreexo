@@ -10,13 +10,13 @@ pub const HASH_SIZE: usize = 32;
 pub struct Hash(pub(crate) [u8; HASH_SIZE]);
 
 impl Hash {
-    /// Converts the hash to a byte slice
+    /// Returns reference to hash as a byte slice
     #[inline]
     pub fn as_bytes(&self) -> &[u8] {
         &self.0[..]
     }
 
-    /// Converts the hash to a byte slice
+    /// Returns reference to hash as a fixed size array of bytes
     #[inline]
     pub fn as_array(&self) -> &[u8; 32] {
         &self.0
@@ -47,6 +47,7 @@ impl fmt::Debug for Hash {
     }
 }
 
+#[doc(hidden)]
 impl From<Blake2Hash> for Hash {
     fn from(blake2_hash: Blake2Hash) -> Hash {
         let mut bytes: [u8; HASH_SIZE] = [0; HASH_SIZE];

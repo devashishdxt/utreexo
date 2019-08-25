@@ -1,4 +1,5 @@
-use std::iter::repeat;
+use alloc::{vec, vec::Vec};
+use core::iter::repeat;
 
 use blake2b_simd::{many::update_many, Params, State};
 
@@ -168,7 +169,12 @@ fn num_nodes(num_leaves: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    // For initializing global memory allocator
+    extern crate std;
+
     use super::*;
+
+    const NUM_TESTING_LEAVES: usize = 1024; // 2^10
 
     #[test]
     fn check_insertion() {
@@ -178,7 +184,7 @@ mod tests {
         assert_eq!(num_nodes(forest.leaves()), forest.len());
         assert!(forest.is_empty());
 
-        for i in 0..1024 {
+        for i in 0..NUM_TESTING_LEAVES {
             forest.insert(b"hello");
 
             assert_eq!(i + 1, forest.leaves());
@@ -193,7 +199,7 @@ mod tests {
         }
 
         let mut batch_forest = Forest::default();
-        batch_forest.extend(&[b"hello"; 1024]);
+        batch_forest.extend(&[b"hello"; NUM_TESTING_LEAVES]);
 
         assert_eq!(forest, batch_forest);
     }
@@ -203,7 +209,7 @@ mod tests {
         let mut distribution = <Vec<usize>>::default();
 
         let start = num.trailing_zeros() as usize;
-        let finish = (std::mem::size_of::<usize>() * 8) - (num.leading_zeros() as usize);
+        let finish = (core::mem::size_of::<usize>() * 8) - (num.leading_zeros() as usize);
         num >>= start;
 
         for i in start..finish {
