@@ -1,9 +1,13 @@
 use core::fmt;
 
+use blake2b_simd::Hash as Blake2Hash;
+
+pub const HASH_SIZE: usize = 32;
+
 /// Represents a hash value
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct Hash(pub(crate) [u8; 64]);
+pub struct Hash(pub(crate) [u8; HASH_SIZE]);
 
 impl Hash {
     /// Converts the hash to a byte slice
@@ -14,15 +18,8 @@ impl Hash {
 
     /// Converts the hash to a byte slice
     #[inline]
-    pub fn as_array(&self) -> &[u8; 64] {
+    pub fn as_array(&self) -> &[u8; 32] {
         &self.0
-    }
-}
-
-impl PartialEq<Hash> for Hash {
-    #[inline]
-    fn eq(&self, other: &Hash) -> bool {
-        self.0[..] == other.0[..]
     }
 }
 
@@ -32,8 +29,6 @@ impl PartialEq<[u8]> for Hash {
         &self.0[..] == other
     }
 }
-
-impl Eq for Hash {}
 
 impl AsRef<[u8]> for Hash {
     #[inline]
@@ -45,24 +40,17 @@ impl AsRef<[u8]> for Hash {
 impl fmt::Debug for Hash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Hash(0x")?;
-        for i in 0..64 {
+        for i in 0..HASH_SIZE {
             write!(f, "{:02x}", self.0[i])?;
         }
         write!(f, ")")
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use blake2b_simd::blake2b;
-
-    #[test]
-    fn check_hash_debug() {
-        let blake2b_hash = blake2b(b"hello");
-        let hash = Hash(*blake2b_hash.as_array());
-
-        assert_eq!(format!("{:?}", blake2b_hash), format!("{:?}", hash));
+impl From<Blake2Hash> for Hash {
+    fn from(blake2_hash: Blake2Hash) -> Hash {
+        let mut bytes: [u8; HASH_SIZE] = [0; HASH_SIZE];
+        bytes.copy_from_slice(blake2_hash.as_bytes());
+        Hash(bytes)
     }
 }

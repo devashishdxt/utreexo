@@ -3,10 +3,8 @@
 
 //! # Utreexo
 
-mod balanced_merkle_tree;
+mod forest;
 mod hash;
-mod utreexo;
 
-pub use self::balanced_merkle_tree::BalancedMerkleTree;
+pub use self::forest::Forest;
 pub use self::hash::Hash;
-pub use self::utreexo::Utreexo;
