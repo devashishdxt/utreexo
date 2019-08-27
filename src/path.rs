@@ -1,4 +1,9 @@
-use core::iter::{DoubleEndedIterator, Iterator};
+use alloc::vec::Vec;
+use core::{
+    convert::TryInto,
+    iter::{DoubleEndedIterator, Iterator},
+    ops::Not,
+};
 
 use bit_vec::{BitVec, Iter};
 
@@ -17,13 +22,61 @@ impl Path {
     /// Returns the number of leaves in the tree of this path
     #[inline]
     pub fn leaves(&self) -> usize {
-        2usize.pow(self.height() as u32)
+        2usize.pow(
+            self.height()
+                .try_into()
+                .expect("Cannot calculate number of leaves for very high trees"),
+        )
     }
 
     /// Returns an iterator over direction in path
     #[inline]
     pub fn directions(&self) -> Directions<'_> {
         Directions(self.0.iter())
+    }
+
+    /// Returns paths for all the leaves in a tree of given height
+    pub fn for_height(height: usize) -> Vec<Path> {
+        let leaves = 2usize.pow(
+            height
+                .try_into()
+                .expect("Cannot calculate paths for very high trees"),
+        );
+
+        let mut paths = Vec::with_capacity(leaves);
+
+        for i in 0..leaves {
+            paths.push(Path::for_height_and_num(height, i));
+        }
+
+        paths
+    }
+
+    /// Creates a new path of given height and using binary representation of given number
+    ///
+    /// # Example
+    ///
+    /// For `height = 3` and `num = 3`:
+    ///
+    /// - Binary representation of `3` is `00000011`
+    /// - So, the resulting path of `height = 3` is `Path(011)`
+    ///
+    /// Similarly, for `height = 3` and `num = 4`, path will be `Path(100)`
+    fn for_height_and_num(mut height: usize, num: usize) -> Path {
+        let mut path = BitVec::with_capacity(height);
+
+        while height > 0 {
+            height -= 1;
+            path.push(
+                num & 2usize.pow(
+                    height
+                        .try_into()
+                        .expect("Cannot calculate path for very high trees"),
+                ) != 0,
+            );
+        }
+
+        Path(path)
     }
 }
 
@@ -36,13 +89,24 @@ pub enum Direction {
     Right,
 }
 
+impl Not for Direction {
+    type Output = Direction;
+
+    fn not(self) -> Direction {
+        match self {
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+        }
+    }
+}
+
 impl From<bool> for Direction {
     #[inline]
     fn from(b: bool) -> Direction {
         if b {
-            Direction::Left
-        } else {
             Direction::Right
+        } else {
+            Direction::Left
         }
     }
 }
@@ -50,8 +114,8 @@ impl From<bool> for Direction {
 impl From<Direction> for bool {
     fn from(direction: Direction) -> bool {
         match direction {
-            Direction::Left => true,
-            Direction::Right => false,
+            Direction::Left => false,
+            Direction::Right => true,
         }
     }
 }

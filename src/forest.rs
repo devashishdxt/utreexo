@@ -1,4 +1,5 @@
 use alloc::{collections::BTreeMap, vec::Vec};
+use core::convert::TryInto;
 
 use bit_vec::BitVec;
 
@@ -302,7 +303,10 @@ fn num_nodes(num_leaves: usize) -> usize {
 /// Returns height of tree with given number of leaves
 #[inline]
 fn height(num_leaves: usize) -> usize {
-    num_leaves.trailing_zeros() as usize
+    num_leaves
+        .trailing_zeros()
+        .try_into()
+        .expect("Cannot calculate height for trees with too many leaves")
 }
 
 #[cfg(test)]
@@ -339,6 +343,10 @@ mod tests {
         }
 
         assert_eq!(NUM_TESTING_LEAVES, forest.paths.len());
+        assert_eq!(
+            leaf_distribution(NUM_TESTING_LEAVES),
+            forest.leaf_distribution
+        );
 
         let mut batch_forest = Forest::default();
         batch_forest.extend(&inputs);

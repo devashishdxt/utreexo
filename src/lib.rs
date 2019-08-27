@@ -9,12 +9,14 @@ mod forest;
 mod hash;
 mod path;
 mod proof;
+mod tree;
 
 pub(crate) use self::path::{Direction, Path};
 
 pub use self::forest::Forest;
 pub use self::hash::Hash;
 pub use self::proof::Proof;
+pub use self::tree::{Tree, TreeRef};
 
 use alloc::vec;
 use core::iter::{repeat, Iterator};
