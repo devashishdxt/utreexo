@@ -7,7 +7,7 @@ description = "A dynamic hash based accumulator for UTXO set"
 homepage = "https://github.com/devashishdxt/utreexo"
 repository = "https://github.com/devashishdxt/utreexo"
 categories = ["cryptography", "data-structures"]
-keywords = ["blockchain", "bitcoin", "utxo", "accumulator", "merkle", "no-std"]
+keywords = ["blockchain", "bitcoin", "utxo", "accumulator", "no-std"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
