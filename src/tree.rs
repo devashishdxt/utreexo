@@ -1,7 +1,7 @@
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use core::convert::TryInto;
 
-use crate::{Hash, Path};
+use crate::{hash_intermediate, hash_many_leaves, Hash, Path};
 
 /// An owned `Vec` representing a merkle tree
 #[derive(Debug)]
@@ -57,14 +57,38 @@ impl Tree {
     ///
     /// This function panics if the tree cannot be split further (when there is only one leaf in the tree)
     pub fn split(mut self) -> (Tree, Tree) {
-        if self.nodes() <= 1 {
-            panic!("Cannot split a tree with less than or equal to one node")
-        }
+        assert!(
+            self.nodes() <= 1,
+            "Cannot split a tree with less than or equal to one node"
+        );
 
         let right = Tree(self.0.split_off(self.nodes() / 2));
         self.0.shrink_to_fit();
 
         (self, right)
+    }
+
+    /// Merges `other` tree in current tree
+    ///
+    /// # Panics
+    ///
+    /// This function panics if both trees are of different height
+    pub fn merge(&mut self, mut other: Tree) {
+        let height = self.height();
+
+        assert_eq!(
+            height,
+            other.height(),
+            "Cannot merge trees with different heights"
+        );
+
+        let root_hash = hash_intermediate(self.root_hash(), other.root_hash());
+
+        self.0.append(&mut other.0);
+        self.0.push(root_hash);
+        self.0.shrink_to_fit();
+
+        debug_assert_eq!(height + 1, self.height());
     }
 }
 
