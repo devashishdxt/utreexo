@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::{hash_intermediate, height, Hash, Path};
+use crate::{hash_intermediate, height, Direction, Hash, Path, Proof};
 
 /// An owned `Vec` representing a merkle tree
 //
@@ -171,7 +171,7 @@ impl<'a> TreeRef<'a> {
     }
 
     /// Returns left and right subtree of current tree; `None` if the tree cannot be split further
-    pub fn split(&self) -> Option<(TreeRef<'_>, TreeRef<'_>)> {
+    pub fn split(&self) -> Option<(TreeRef<'a>, TreeRef<'a>)> {
         if self.nodes() > 1 {
             let break_point = (self.nodes() - 1) / 2;
             Some((
@@ -214,6 +214,47 @@ impl<'a> TreeRef<'a> {
     #[inline]
     pub fn leaf_paths(&self) -> Vec<Path> {
         Path::for_height(self.height())
+    }
+
+    /// Generates inclusion proof for given leaf hash and path
+    pub fn prove(self, leaf_hash: Hash, path: Path) -> Option<Proof> {
+        let height = self.height();
+
+        assert_eq!(
+            height,
+            path.height(),
+            "Tree height and path height should be equal to generate a proof"
+        );
+
+        let mut sibling_hashes = Vec::with_capacity(height);
+
+        let mut tree = self;
+
+        for direction in path.directions() {
+            let (left_subtree, right_subtree) =
+                tree.split().expect("Expected sub-trees while proving");
+
+            match direction {
+                Direction::Left => {
+                    sibling_hashes.push(right_subtree.root_hash());
+                    tree = left_subtree;
+                }
+                Direction::Right => {
+                    sibling_hashes.push(left_subtree.root_hash());
+                    tree = right_subtree;
+                }
+            }
+        }
+
+        if tree.root_hash() == leaf_hash {
+            Some(Proof {
+                path,
+                leaf_hash,
+                sibling_hashes,
+            })
+        } else {
+            None
+        }
     }
 }
 

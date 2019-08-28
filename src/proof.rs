@@ -5,10 +5,10 @@ use crate::{hash_intermediate, Direction, Hash, Path};
 /// Inclusion proof of a value in a merkle forest
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Proof {
-    // Path is from leaf node to root node
+    // Path is from root node to leaf
     pub(crate) path: Path,
     pub(crate) leaf_hash: Hash,
-    // Sibling hashes are from bottom to top
+    // Sibling hashes are from top to bottom
     pub(crate) sibling_hashes: Vec<Hash>,
 }
 
@@ -31,8 +31,8 @@ impl Proof {
             return root_hash == self.leaf_hash;
         }
 
-        let path = self.path.directions();
-        let mut sibling_hashes = self.sibling_hashes.iter();
+        let path = self.path.directions().rev();
+        let mut sibling_hashes = self.sibling_hashes.iter().rev();
 
         let mut hash = self.leaf_hash;
 

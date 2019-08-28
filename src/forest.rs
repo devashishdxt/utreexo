@@ -1,8 +1,7 @@
 use alloc::{collections::BTreeMap, vec::Vec};
 
 use crate::{
-    hash_intermediate, hash_leaf, hash_many_leaves, num_nodes, Direction, Hash, Path, Proof,
-    TreeRef,
+    hash_intermediate, hash_leaf, hash_many_leaves, num_nodes, Hash, Path, Proof, TreeRef,
 };
 
 /// Implementation of a merkle forest
@@ -57,12 +56,11 @@ impl Forest {
         // Get hash of value
         let hash = hash_leaf(value);
 
-        // Get path of value from `paths` map
+        // Get path of value from `path_map`
         let path = self.path_map.get(&hash)?.clone();
 
-        // Calculate number of leaves and height of tree of the path
+        // Calculate number of leaves in tree of the path
         let leaves = path.leaves();
-        let height = path.height();
 
         // Find the index of tree with above height in leaf distribution
         let index = self
@@ -70,59 +68,11 @@ impl Forest {
             .binary_search_by(|p| p.cmp(&leaves).reverse())
             .unwrap();
 
-        // Calculate the root index of tree with above height in forest
-        // (number of places to skip to reach the tree + number of nodes in the tree - 1)
-        let root_index = self
-            .leaf_distribution
-            .iter()
-            .take(index)
-            .map(|num_leaves| num_nodes(*num_leaves))
-            .sum::<usize>()
-            + num_nodes(leaves)
-            - 1;
+        // Get tree ref with index
+        let tree = self.get_tree_ref_with_index(index);
 
-        let mut accumulating_index = 0;
-
-        // # Formulas
-        //
-        // Go to the right child:
-        //   right child index = root_index - ((2 * accumulator_index) + 1)
-        //   new accumulator index = (2 * accumulator_index) + 1
-        //
-        // Go to the left child:
-        //   left child index = root_index - ((2 * accumulator_index) + 2)
-        //   new accumulator index = (2 * accumulator_index) + 2
-
-        let mut sibling_hashes = Vec::with_capacity(height);
-
-        for direction in path.directions().rev() {
-            match direction {
-                Direction::Left => {
-                    // Add hash of right index to sibling hashes and move accumulator to left index
-                    sibling_hashes.push(self.forest[root_index - ((accumulating_index * 2) + 1)]);
-                    accumulating_index = (accumulating_index * 2) + 2;
-                }
-                Direction::Right => {
-                    // Add hash of left index to sibling hashes and move accumulator to right index
-                    sibling_hashes.push(self.forest[root_index - ((accumulating_index * 2) + 2)]);
-                    accumulating_index = (accumulating_index * 2) + 1;
-                }
-            }
-        }
-
-        let leaf_hash = self.forest[root_index - accumulating_index];
-
-        // Reverse sibling hashes because proof expects these hashes from bottom to top
-        sibling_hashes.reverse();
-
-        // Sibling hashes should be full
-        debug_assert_eq!(sibling_hashes.len(), sibling_hashes.capacity());
-
-        Some(Proof {
-            path,
-            leaf_hash,
-            sibling_hashes,
-        })
+        // Prove
+        tree.prove(hash, path)
     }
 
     /// Verifies inclusion proof
@@ -227,9 +177,11 @@ impl Forest {
         let tree_ref =
             self.get_tree_ref_with_index(self.leaf_distribution[self.leaf_distribution.len() - 1]);
 
+        // Get leaf hashes and leaf paths
         let leaf_hashes = tree_ref.leaf_hashes();
         let leaf_paths = tree_ref.leaf_paths();
 
+        // Insert into path map
         self.path_map
             .extend(leaf_hashes.into_iter().zip(leaf_paths.into_iter()));
     }
