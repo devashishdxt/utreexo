@@ -33,6 +33,12 @@ impl Tree {
         TreeRef(&self.0)
     }
 
+    /// Returns `TreeRefMut` for current tree
+    #[inline]
+    pub fn as_ref_mut(&mut self) -> TreeRefMut<'_> {
+        TreeRefMut(&mut self.0)
+    }
+
     /// Returns number of leaves in tree
     #[inline]
     pub fn leaves(&self) -> usize {
@@ -91,22 +97,45 @@ impl Tree {
     /// # Panics
     ///
     /// This function panics if both trees are of different height
+    #[inline]
     pub fn merge(&mut self, mut other: Tree) {
-        let height = self.height();
+        self.as_ref_mut().merge(other.as_ref_mut())
+    }
+}
+
+/// Reference to a mutable `Vec` representing a merkle tree
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct TreeRefMut<'a>(&'a mut Vec<Hash>);
+
+impl<'a> TreeRefMut<'a> {
+    /// Returns `TreeRef` for current tree
+    #[inline]
+    pub fn as_ref(&self) -> TreeRef<'_> {
+        TreeRef(&self.0)
+    }
+
+    /// Merges `other` tree in current tree
+    ///
+    /// # Panics
+    ///
+    /// This function panics if both trees are of different height
+    pub fn merge(&mut self, mut other: TreeRefMut<'_>) {
+        let height = self.as_ref().height();
 
         assert_eq!(
             height,
-            other.height(),
+            other.as_ref().height(),
             "Cannot merge trees with different heights"
         );
 
-        let root_hash = hash_intermediate(self.root_hash(), other.root_hash());
+        let root_hash = hash_intermediate(self.as_ref().root_hash(), other.as_ref().root_hash());
 
         self.0.append(&mut other.0);
         self.0.push(root_hash);
         self.0.shrink_to_fit();
 
-        debug_assert_eq!(height + 1, self.height());
+        debug_assert_eq!(height + 1, self.as_ref().height());
     }
 }
 

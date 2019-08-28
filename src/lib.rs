@@ -16,7 +16,7 @@ pub(crate) use self::path::{Direction, Path};
 pub use self::forest::Forest;
 pub use self::hash::Hash;
 pub use self::proof::Proof;
-pub use self::tree::{Tree, TreeRef};
+pub use self::tree::{Tree, TreeRef, TreeRefMut};
 
 use alloc::vec;
 use core::iter::{repeat, Iterator};
