@@ -1,9 +1,9 @@
 use alloc::{collections::BTreeMap, vec::Vec};
-use core::convert::TryInto;
 
-use bit_vec::BitVec;
-
-use crate::{hash_intermediate, hash_leaf, hash_many_leaves, Direction, Hash, Path, Proof};
+use crate::{
+    hash_intermediate, hash_leaf, hash_many_leaves, num_nodes, Direction, Hash, Path, Proof,
+    TreeRef,
+};
 
 /// Implementation of a merkle forest
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -14,8 +14,8 @@ pub struct Forest {
     forest: Vec<Hash>,
     /// Leaf distribution
     leaf_distribution: Vec<usize>,
-    /// Paths for leaves
-    paths: BTreeMap<Hash, Path>,
+    /// Path map for leaves
+    path_map: BTreeMap<Hash, Path>,
 }
 
 impl Forest {
@@ -27,7 +27,7 @@ impl Forest {
 
     /// Returns total number of nodes in forest
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn nodes(&self) -> usize {
         self.forest.len()
     }
 
@@ -38,30 +38,17 @@ impl Forest {
     }
 
     /// Inserts a new value in forest
+    #[inline]
     pub fn insert<T: AsRef<[u8]>>(&mut self, value: T) {
-        // Calculate hash of `value`
-        let hash = hash_leaf(value);
-
-        // Insert hash in forest if it does not already exists and run compression
-        if !self.paths.contains_key(&hash) {
-            self.forest.push(hash);
-            self.leaves += 1;
-            self.leaf_distribution.push(1);
-
-            self.compress();
-        }
+        // Calculate hash of `value` and insert it into forest
+        self.insert_hash(hash_leaf(value))
     }
 
     /// Batch inserts new values in forest
+    #[inline]
     pub fn extend<T: AsRef<[u8]>>(&mut self, values: &[T]) {
         for hash in hash_many_leaves(values) {
-            if !self.paths.contains_key(&hash) {
-                self.forest.push(hash);
-                self.leaves += 1;
-                self.leaf_distribution.push(1);
-
-                self.compress();
-            }
+            self.insert_hash(hash)
         }
     }
 
@@ -71,7 +58,7 @@ impl Forest {
         let hash = hash_leaf(value);
 
         // Get path of value from `paths` map
-        let path = self.paths.get(&hash)?.clone();
+        let path = self.path_map.get(&hash)?.clone();
 
         // Calculate number of leaves and height of tree of the path
         let leaves = path.leaves();
@@ -170,210 +157,80 @@ impl Forest {
         }
     }
 
-    /// Compresses forest by merging trees of equal length from right to left
-    fn compress(&mut self) {
-        // Compression cannot be performed if the number of trees are either 0 or 1
-        while self.leaf_distribution.len() >= 2
-            && self.leaf_distribution[self.leaf_distribution.len() - 1]
-                == self.leaf_distribution[self.leaf_distribution.len() - 2]
-        {
-            // Calculate number of hashes before last two trees
-            let skip: usize = self
-                .leaf_distribution
-                .iter()
-                .take(self.leaf_distribution.len() - 2)
-                .map(|num_leaves| num_nodes(*num_leaves))
-                .sum();
+    // Insert hash in forest if it does not already exists and run compression
+    fn insert_hash(&mut self, hash: Hash) {
+        if !self.path_map.contains_key(&hash) {
+            self.forest.push(hash);
+            self.leaves += 1;
+            self.leaf_distribution.push(1);
 
-            // Split off the two trees to merge in two different `Vec`s
-            let mut first_half = self.forest.split_off(skip);
-            let second_half = first_half.split_off(first_half.len() / 2);
-
-            // Number of leaves, nodes and height of both halves
-            let leaves = self.leaf_distribution[self.leaf_distribution.len() - 1];
-            let nodes = num_nodes(leaves);
-            let height = height(leaves);
-
-            // Length of both halves should be equal to number of nodes
-            debug_assert_eq!(nodes, first_half.len());
-            debug_assert_eq!(nodes, second_half.len());
-
-            let mut items_to_take = leaves;
-            let mut hashes = Vec::with_capacity((2 * nodes) + 1);
-
-            let mut first_half_hashes = first_half.into_iter();
-            let mut second_half_hashes = second_half.into_iter();
-
-            for _ in 0..=height {
-                // Take lowermost row from first half
-                for _ in 0..items_to_take {
-                    hashes.push(first_half_hashes.next().unwrap());
-                }
-
-                // Take lowermost row from second half
-                for _ in 0..items_to_take {
-                    hashes.push(second_half_hashes.next().unwrap());
-                }
-
-                // Update `items_to_take`
-                items_to_take /= 2;
-            }
-
-            // Calculate new root and add it to hashes
-            hashes.push(hash_intermediate(
-                &hashes[hashes.len() - 2],
-                &hashes[hashes.len() - 1],
-            ));
-
-            // After hashing for all the heights, hashes `Vec` should be full
-            debug_assert_eq!(
-                hashes.capacity(),
-                hashes.len(),
-                "Hashes are not filled completely while merging two balanced merkle trees"
-            );
-
-            self.forest.append(&mut hashes);
-
-            // Modify leaf distribution
-            let first_half_leaves = self.leaf_distribution.pop().unwrap();
-            let second_half_leaves = self.leaf_distribution.pop().unwrap();
-            self.leaf_distribution
-                .push(first_half_leaves + second_half_leaves);
+            self.compress();
+            self.update_paths();
         }
-
-        // Update path of leaves in set
-        self.update_paths();
     }
 
-    /// Updates path for all the leaves after one insertion
+    fn get_tree_ref_with_index(&self, index: usize) -> TreeRef<'_> {
+        // Calculate number of nodes before tree in forest
+        let nodes_before_tree = self
+            .leaf_distribution
+            .iter()
+            .take(index)
+            .map(|leaves| num_nodes(*leaves))
+            .sum();
+
+        // Calculate number of nodes in tree
+        let nodes_in_tree = num_nodes(self.leaf_distribution[index]);
+
+        // Return tree ref with size
+        TreeRef(&self.forest[nodes_before_tree..(nodes_before_tree + nodes_in_tree)])
+    }
+
+    /// Compresses forest by merging trees of equal length from right to left
+    fn compress(&mut self) {
+        while self.is_compressible() {
+            // Get left and right tree refs
+            let left_tree = self.get_tree_ref_with_index(self.leaf_distribution.len() - 2);
+            let right_tree = self.get_tree_ref_with_index(self.leaf_distribution.len() - 1);
+
+            // Calculate root hash of merged tree
+            let root_hash = hash_intermediate(left_tree.root_hash(), right_tree.root_hash());
+
+            // Push root hash in forest
+            self.forest.push(root_hash);
+
+            // Update leaf distribution
+            let right_tree_leaves = self
+                .leaf_distribution
+                .pop()
+                .expect("Expected right tree leaves");
+            let left_tree_index = self.leaf_distribution.len() - 1;
+            self.leaf_distribution[left_tree_index] += right_tree_leaves;
+        }
+    }
+
+    /// Returns true if current tree can be compressed
+    fn is_compressible(&self) -> bool {
+        // Compression cannot be performed if the number of trees are either 0 or 1.
+        // Compression has to be performed only when last two trees are of equal length.
+        self.leaf_distribution.len() >= 2
+            && self.leaf_distribution[self.leaf_distribution.len() - 1]
+                == self.leaf_distribution[self.leaf_distribution.len() - 2]
+    }
+
+    /// Updates path for all the leaves after one insertion (updates paths for all the leaves in last tree)
     ///
     /// # Note
     ///
     /// This function should be called after each (insertion + compression) operation
     fn update_paths(&mut self) {
-        // Calculate number of hashes before last tree
-        let skip: usize = self
-            .leaf_distribution
-            .iter()
-            .take(self.leaf_distribution.len() - 1)
-            .map(|num_leaves| num_nodes(*num_leaves))
-            .sum();
+        // Get tree ref of last tree
+        let tree_ref =
+            self.get_tree_ref_with_index(self.leaf_distribution[self.leaf_distribution.len() - 1]);
 
-        // Number of leaves in last tree
-        let leaves = self.leaf_distribution[self.leaf_distribution.len() - 1];
+        let leaf_hashes = tree_ref.leaf_hashes();
+        let leaf_paths = tree_ref.leaf_paths();
 
-        // Height of last tree
-        let height = height(leaves);
-
-        // Leaves to be updated
-        let hashes = self.forest.iter().skip(skip).take(leaves);
-
-        for hash in hashes {
-            match self.paths.get_mut(hash) {
-                None => {
-                    let path = BitVec::from_elem(height, Direction::Right.into());
-                    self.paths.insert(*hash, Path(path));
-                }
-                Some(ref mut path) => {
-                    let steps_to_insert = height - path.height();
-                    debug_assert!(steps_to_insert > 0);
-
-                    path.0.reserve(steps_to_insert);
-                    path.0.push(Direction::Left.into());
-
-                    for _ in 0..(steps_to_insert - 1) {
-                        path.0.push(Direction::Right.into());
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Returns the number of nodes in a tree given the number of leaves (`2n - 1`)
-#[inline]
-fn num_nodes(num_leaves: usize) -> usize {
-    if num_leaves == 0 {
-        0
-    } else {
-        (2 * num_leaves) - 1
-    }
-}
-
-/// Returns height of tree with given number of leaves
-#[inline]
-fn height(num_leaves: usize) -> usize {
-    num_leaves
-        .trailing_zeros()
-        .try_into()
-        .expect("Cannot calculate height for trees with too many leaves")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const NUM_TESTING_LEAVES: usize = 1024; // 2^10
-
-    #[test]
-    fn check_flow() {
-        let mut inputs = Vec::default();
-
-        let mut forest = Forest::default();
-
-        assert_eq!(0, forest.leaves());
-        assert_eq!(num_nodes(forest.leaves()), forest.len());
-        assert!(forest.is_empty());
-
-        for i in 0..NUM_TESTING_LEAVES {
-            let input = format!("hello{}", i);
-
-            forest.insert(&input);
-            inputs.push(input);
-
-            assert_eq!(i + 1, forest.leaves());
-            assert_eq!(
-                leaf_distribution(forest.leaves())
-                    .into_iter()
-                    .map(num_nodes)
-                    .sum::<usize>(),
-                forest.len()
-            );
-            assert!(!forest.is_empty());
-        }
-
-        assert_eq!(NUM_TESTING_LEAVES, forest.paths.len());
-        assert_eq!(
-            leaf_distribution(NUM_TESTING_LEAVES),
-            forest.leaf_distribution
-        );
-
-        let mut batch_forest = Forest::default();
-        batch_forest.extend(&inputs);
-
-        assert_eq!(forest, batch_forest);
-        assert!(forest.prove(format!("hello")).is_none());
-
-        let proof = forest.prove(format!("hello512")).unwrap();
-        assert!(forest.verify(&proof))
-    }
-
-    /// Returns leaf distribution in merkle forest for given number of leaf values
-    fn leaf_distribution(mut num: usize) -> Vec<usize> {
-        let mut distribution = <Vec<usize>>::default();
-
-        let start = height(num);
-        let finish = (core::mem::size_of::<usize>() * 8) - (num.leading_zeros() as usize);
-        num >>= start;
-
-        for i in start..finish {
-            if num & 1 == 1 {
-                distribution.push(2_usize.pow(i as u32));
-            }
-            num >>= 1;
-        }
-
-        distribution.reverse();
-        distribution
+        self.path_map
+            .extend(leaf_hashes.into_iter().zip(leaf_paths.into_iter()));
     }
 }

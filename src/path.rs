@@ -7,7 +7,7 @@ use core::{
 
 use bit_vec::{BitVec, Iter};
 
-/// Represents path in a merkle proof
+/// Represents path in a merkle proof (direction of path is from root to leaf)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Path(pub(crate) BitVec);

@@ -18,8 +18,11 @@ pub use self::hash::Hash;
 pub use self::proof::Proof;
 pub use self::tree::{Tree, TreeRef, TreeRefMut};
 
-use alloc::vec;
-use core::iter::{repeat, Iterator};
+use alloc::{vec, vec::Vec};
+use core::{
+    convert::TryInto,
+    iter::{repeat, Iterator},
+};
 
 use blake2b_simd::{many::update_many, Params};
 
@@ -68,4 +71,43 @@ pub(crate) fn hash_intermediate<T: AsRef<[u8]>>(a: T, b: T) -> Hash {
     state.update(b.as_ref());
 
     state.finalize().into()
+}
+
+/// Returns the number of nodes in a tree given the number of leaves (`2n - 1`)
+#[inline]
+pub(crate) fn num_nodes(num_leaves: usize) -> usize {
+    if num_leaves == 0 {
+        0
+    } else {
+        (2 * num_leaves) - 1
+    }
+}
+
+/// Returns height of tree with given number of leaves
+#[inline]
+pub(crate) fn height(num_leaves: usize) -> usize {
+    num_leaves
+        .trailing_zeros()
+        .try_into()
+        .expect("Cannot calculate height for trees with too many leaves")
+}
+
+/// Returns leaf distribution in merkle forest for given number of leaf values
+#[allow(dead_code)]
+pub(crate) fn leaf_distribution(mut num_leaves: usize) -> Vec<usize> {
+    let mut distribution = <Vec<usize>>::default();
+
+    let start = height(num_leaves);
+    let finish = (core::mem::size_of::<usize>() * 8) - (num_leaves.leading_zeros() as usize);
+    num_leaves >>= start;
+
+    for i in start..finish {
+        if num_leaves & 1 == 1 {
+            distribution.push(2_usize.pow(i as u32));
+        }
+        num_leaves >>= 1;
+    }
+
+    distribution.reverse();
+    distribution
 }

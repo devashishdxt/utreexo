@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
-use core::convert::TryInto;
 
-use crate::{hash_intermediate, Hash, Path};
+use crate::{hash_intermediate, height, Hash, Path};
 
 /// An owned `Vec` representing a merkle tree
 //
@@ -82,11 +81,12 @@ impl Tree {
     /// This function panics if the tree cannot be split further (when there is only one leaf in the tree)
     pub fn split(mut self) -> (Tree, Tree) {
         assert!(
-            self.nodes() <= 1,
+            self.nodes() > 1,
             "Cannot split a tree with less than or equal to one node"
         );
 
-        let right = Tree(self.0.split_off(self.nodes() / 2));
+        let mut right = Tree(self.0.split_off(self.nodes() / 2));
+        let _ = right.0.pop().expect("Expected root node while splitting");
         self.0.shrink_to_fit();
 
         (self, right)
@@ -98,7 +98,7 @@ impl Tree {
     ///
     /// This function panics if both trees are of different height
     #[inline]
-    pub fn merge(&mut self, mut other: Tree) {
+    pub fn merge(&mut self, other: &mut Tree) {
         self.as_ref_mut().merge(other.as_ref_mut())
     }
 }
@@ -161,10 +161,7 @@ impl<'a> TreeRef<'a> {
     /// Returns height of tree
     #[inline]
     pub fn height(&self) -> usize {
-        self.leaves()
-            .trailing_zeros()
-            .try_into()
-            .expect("Cannot calculate height for trees with too many leaves")
+        height(self.leaves())
     }
 
     /// Returns root hash of tree
@@ -317,5 +314,35 @@ mod tests {
         assert_eq!(Direction::Right, eighth_leaf_directions.next().unwrap());
         assert_eq!(Direction::Right, eighth_leaf_directions.next().unwrap());
         assert!(eighth_leaf_directions.next().is_none());
+    }
+
+    #[test]
+    fn check_tree_merging_and_splitting() {
+        let nodes_1 = (0..7)
+            .map(|value: usize| hash_leaf(&value.to_be_bytes()))
+            .collect::<Vec<Hash>>();
+        let nodes_2 = (7..14)
+            .map(|value: usize| hash_leaf(&value.to_be_bytes()))
+            .collect::<Vec<Hash>>();
+
+        let mut tree_1 = Tree(nodes_1);
+        let mut tree_2 = Tree(nodes_2);
+
+        let root_hash_1 = tree_1.root_hash();
+        let root_hash_2 = tree_2.root_hash();
+
+        let combined_root_hash = hash_intermediate(root_hash_1, root_hash_2);
+
+        tree_1.merge(&mut tree_2);
+
+        assert_eq!(tree_1.root_hash(), combined_root_hash);
+        assert_eq!(3, tree_1.height());
+        assert_eq!(15, tree_1.nodes());
+        assert_eq!(8, tree_1.leaves());
+
+        let (split_tree_1, split_tree_2) = tree_1.split();
+
+        assert_eq!(split_tree_1.root_hash(), root_hash_1);
+        assert_eq!(split_tree_2.root_hash(), root_hash_2);
     }
 }
