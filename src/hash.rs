@@ -7,19 +7,19 @@ pub const HASH_SIZE: usize = 32;
 /// Represents a hash value
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct Hash(pub(crate) [u8; HASH_SIZE]);
+pub struct Hash([u8; HASH_SIZE]);
 
-impl Hash {
-    /// Returns reference to hash as a byte slice
+impl From<[u8; HASH_SIZE]> for Hash {
     #[inline]
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0[..]
+    fn from(inner: [u8; HASH_SIZE]) -> Hash {
+        Hash(inner)
     }
+}
 
-    /// Returns reference to hash as a fixed size array of bytes
+impl From<Hash> for [u8; HASH_SIZE] {
     #[inline]
-    pub fn as_array(&self) -> &[u8; 32] {
-        &self.0
+    fn from(hash: Hash) -> [u8; HASH_SIZE] {
+        hash.0
     }
 }
 

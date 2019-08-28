@@ -18,6 +18,12 @@ pub struct Forest {
 }
 
 impl Forest {
+    /// Creates a new empty forest
+    #[inline]
+    pub fn new() -> Forest {
+        Forest::default()
+    }
+
     /// Returns the number of leaves currently stored in forest
     #[inline]
     pub fn leaves(&self) -> usize {
@@ -52,9 +58,9 @@ impl Forest {
     }
 
     /// Generates inclusion proof of given leaf value
-    pub fn prove<T: AsRef<[u8]>>(&self, value: T) -> Option<Proof> {
+    pub fn prove<T: AsRef<[u8]>>(&self, value: T) -> Option<Proof<T>> {
         // Get hash of value
-        let hash = hash_leaf(value);
+        let hash = hash_leaf(&value);
 
         // Get path of value from `path_map`
         let path = self.path_map.get(&hash)?.clone();
@@ -72,11 +78,11 @@ impl Forest {
         let tree = self.get_tree_ref_with_index(index);
 
         // Prove
-        tree.prove(hash, path)
+        tree.prove(value, path)
     }
 
     /// Verifies inclusion proof
-    pub fn verify(&self, proof: &Proof) -> bool {
+    pub fn verify<T: AsRef<[u8]>>(&self, proof: &Proof<T>) -> bool {
         // Calculate number of leaves in tree of given proof
         let leaves = proof.leaves();
 
@@ -174,8 +180,7 @@ impl Forest {
     /// This function should be called after each (insertion + compression) operation
     fn update_paths(&mut self) {
         // Get tree ref of last tree
-        let tree_ref =
-            self.get_tree_ref_with_index(self.leaf_distribution[self.leaf_distribution.len() - 1]);
+        let tree_ref = self.get_tree_ref_with_index(self.leaf_distribution.len() - 1);
 
         // Get leaf hashes and leaf paths
         let leaf_hashes = tree_ref.leaf_hashes();
@@ -184,5 +189,75 @@ impl Forest {
         // Insert into path map
         self.path_map
             .extend(leaf_hashes.into_iter().zip(leaf_paths.into_iter()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::leaf_distribution;
+
+    #[test]
+    fn check_forest_flow() {
+        let mut forest = Forest::new();
+        assert!(forest.is_empty());
+
+        forest.insert("hello0");
+        assert!(!forest.is_empty());
+        assert_eq!(1, forest.leaves());
+        assert_eq!(1, forest.nodes());
+
+        forest.insert("hello1");
+        assert_eq!(2, forest.leaves());
+        assert_eq!(3, forest.nodes());
+
+        forest.extend(&["hello2", "hello3"]);
+        assert_eq!(4, forest.leaves());
+        assert_eq!(7, forest.nodes());
+
+        forest.insert("hello4");
+        assert_eq!(5, forest.leaves());
+        assert_eq!(8, forest.nodes());
+
+        forest.insert("hello5");
+        assert_eq!(6, forest.leaves());
+        assert_eq!(10, forest.nodes());
+
+        forest.insert("hello6");
+        assert_eq!(7, forest.leaves());
+        assert_eq!(11, forest.nodes());
+
+        let proof = forest.prove("hello0").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello1").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello2").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello3").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello4").expect("Expected a proof");
+        assert_eq!(1, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello5").expect("Expected a proof");
+        assert_eq!(1, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello6").expect("Expected a proof");
+        assert_eq!(0, proof.height());
+        assert!(forest.verify(&proof));
+
+        assert_eq!(leaf_distribution(7), forest.leaf_distribution);
+
+        assert!(forest.prove("hello7").is_none());
     }
 }

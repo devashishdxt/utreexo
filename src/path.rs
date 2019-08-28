@@ -138,3 +138,62 @@ impl<'a> DoubleEndedIterator for Directions<'a> {
         self.0.next_back().map(Into::into)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_path_leaves_and_height() {
+        let path = Path(BitVec::from_elem(3, false));
+
+        assert_eq!(3, path.height());
+        assert_eq!(8, path.leaves());
+    }
+
+    #[test]
+    fn check_path_directions() {
+        let path = Path(BitVec::from_elem(3, false));
+        let mut directions = path.directions();
+
+        assert_eq!(Direction::Left, directions.next().unwrap());
+        assert_eq!(Direction::Left, directions.next().unwrap());
+        assert_eq!(Direction::Left, directions.next().unwrap());
+        assert!(directions.next().is_none());
+
+        assert_eq!(Direction::Left, !Direction::Right);
+        assert_eq!(Direction::Left, false.into());
+        assert_eq!(Direction::Right, true.into());
+    }
+
+    #[test]
+    fn check_path_for_height() {
+        let paths = Path::for_height(2);
+
+        assert_eq!(4, paths.len());
+
+        let mut directions = paths[0].directions();
+
+        assert_eq!(Direction::Left, directions.next().unwrap());
+        assert_eq!(Direction::Left, directions.next().unwrap());
+        assert!(directions.next().is_none());
+
+        directions = paths[1].directions();
+
+        assert_eq!(Direction::Left, directions.next().unwrap());
+        assert_eq!(Direction::Right, directions.next().unwrap());
+        assert!(directions.next().is_none());
+
+        directions = paths[2].directions();
+
+        assert_eq!(Direction::Right, directions.next().unwrap());
+        assert_eq!(Direction::Left, directions.next().unwrap());
+        assert!(directions.next().is_none());
+
+        directions = paths[3].directions();
+
+        assert_eq!(Direction::Right, directions.next().unwrap());
+        assert_eq!(Direction::Right, directions.next().unwrap());
+        assert!(directions.next().is_none());
+    }
+}

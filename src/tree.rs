@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::{hash_intermediate, height, Direction, Hash, Path, Proof};
+use crate::{hash_intermediate, hash_leaf, height, Direction, Hash, Path, Proof};
 
 /// An owned `Vec` representing a merkle tree
 //
@@ -217,7 +217,8 @@ impl<'a> TreeRef<'a> {
     }
 
     /// Generates inclusion proof for given leaf hash and path
-    pub fn prove(self, leaf_hash: Hash, path: Path) -> Option<Proof> {
+    pub fn prove<T: AsRef<[u8]>>(self, leaf_value: T, path: Path) -> Option<Proof<T>> {
+        let leaf_hash = hash_leaf(&leaf_value);
         let height = self.height();
 
         assert_eq!(
@@ -249,7 +250,7 @@ impl<'a> TreeRef<'a> {
         if tree.root_hash() == leaf_hash {
             Some(Proof {
                 path,
-                leaf_hash,
+                leaf_value,
                 sibling_hashes,
             })
         } else {
@@ -265,7 +266,7 @@ mod tests {
     use crate::{hash_leaf, Direction};
 
     #[test]
-    fn check_leaves_and_height() {
+    fn check_tree_leaves_and_height() {
         let nodes = (0..15)
             .map(|value: usize| hash_leaf(&value.to_be_bytes()))
             .collect::<Vec<Hash>>();
@@ -277,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn check_leaf_hashes() {
+    fn check_tree_leaf_hashes() {
         let nodes = (0..15)
             .map(|value: usize| hash_leaf(&value.to_be_bytes()))
             .collect::<Vec<Hash>>();
@@ -292,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn check_leaf_paths() {
+    fn check_tree_leaf_paths() {
         let nodes = (0..15)
             .map(|value: usize| hash_leaf(&value.to_be_bytes()))
             .collect::<Vec<Hash>>();

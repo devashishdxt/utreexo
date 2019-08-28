@@ -12,11 +12,11 @@ mod proof;
 mod tree;
 
 pub(crate) use self::path::{Direction, Path};
+pub(crate) use self::tree::TreeRef;
 
 pub use self::forest::Forest;
 pub use self::hash::Hash;
 pub use self::proof::Proof;
-pub use self::tree::{Tree, TreeRef, TreeRefMut};
 
 use alloc::{vec, vec::Vec};
 use core::{
@@ -58,6 +58,7 @@ pub(crate) fn hash_many_leaves<T: AsRef<[u8]>>(values: &[T]) -> impl Iterator<It
     states.into_iter().map(|state| state.finalize().into())
 }
 
+/// Calculates intermediate hash of two values
 pub(crate) fn hash_intermediate<T: AsRef<[u8]>>(a: T, b: T) -> Hash {
     let mut params = Params::default();
     params.hash_length(HASH_SIZE);
@@ -110,4 +111,26 @@ pub(crate) fn leaf_distribution(mut num_leaves: usize) -> Vec<usize> {
 
     distribution.reverse();
     distribution
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_leaf_distribution() {
+        let leaf_distribution = leaf_distribution(15);
+        assert_eq!(vec![8, 4, 2, 1], leaf_distribution);
+    }
+
+    #[test]
+    fn check_num_nodes() {
+        assert_eq!(0, num_nodes(0));
+        assert_eq!(15, num_nodes(8));
+    }
+
+    #[test]
+    fn check_height() {
+        assert_eq!(3, height(8));
+    }
 }
