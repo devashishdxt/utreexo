@@ -388,5 +388,41 @@ mod tests {
         let proof = forest.prove("hello6").expect("Expected a proof");
         assert_eq!(0, proof.height());
         assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello3").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        assert!(forest.delete(proof));
+
+        assert_eq!(6, forest.leaves());
+        assert_eq!(10, forest.nodes());
+
+        assert_eq!(leaf_distribution(6), forest.leaf_distribution);
+        assert!(forest.prove("hello3").is_none());
+
+        let proof = forest.prove("hello0").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello1").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello2").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello6").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello4").expect("Expected a proof");
+        assert_eq!(1, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello5").expect("Expected a proof");
+        assert_eq!(1, proof.height());
+        assert!(forest.verify(&proof));
     }
 }
