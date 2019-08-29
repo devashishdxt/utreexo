@@ -169,13 +169,16 @@ impl<'a> TreeRefMut<'a> {
         TreeRef(&self.0).root_hash()
     }
 
-    /// Swaps the leaf represented by proof with given leaf hash. Returns true if the swap was successful, false
+    /// Swaps the leaf represented by proof with given leaf value. Returns true if the swap was successful, false
     /// otherwise.
-    pub fn swap<T: AsRef<[u8]>>(&mut self, proof: &Proof<T>, mut leaf_hash: Hash) -> bool {
+    pub fn swap<T: AsRef<[u8]>>(&mut self, proof: &Proof<T>, leaf_value: T) -> bool {
         // Verify the proof
         if !proof.verify(self.root_hash()) {
             return false;
         }
+
+        // Compute new leaf hash
+        let mut leaf_hash = hash_leaf(leaf_value);
 
         // Compute all the new hashes along the path of proof by combining with sibling hash and new leaf hash from
         // bottom to top
@@ -384,36 +387,25 @@ mod tests {
             ]),
         ];
         let tree = TreeRef(&nodes);
-        let root_hash = tree.root_hash();
 
         let leaf_path = tree.leaf_paths()[2].clone();
         let leaf_proof = tree.prove("hello2", leaf_path).unwrap();
-
         let tree = TreeRef(&nodes);
-
         leaf_proof.verify(tree.root_hash());
 
-        let leaf_value = "hello8";
-        let leaf_hash = hash_leaf(leaf_value);
-
         let mut tree = TreeRefMut(&mut nodes);
-        assert!(tree.swap(&leaf_proof, leaf_hash));
+        assert!(tree.swap(&leaf_proof, "hello8"));
 
         let tree = TreeRef(&nodes);
-        assert_ne!(tree.root_hash(), root_hash);
 
         let leaf_path = tree.leaf_paths()[2].clone();
         let leaf_proof = tree.prove("hello8", leaf_path).unwrap();
-
         let tree = TreeRef(&nodes);
-
         leaf_proof.verify(tree.root_hash());
 
         let leaf_path = tree.leaf_paths()[5].clone();
         let leaf_proof = tree.prove("hello5", leaf_path).unwrap();
-
         let tree = TreeRef(&nodes);
-
         leaf_proof.verify(tree.root_hash());
     }
 }
