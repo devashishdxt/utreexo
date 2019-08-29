@@ -1,7 +1,9 @@
 use alloc::{collections::BTreeMap, vec::Vec};
+use core::convert::TryInto;
 
 use crate::{
     hash_intermediate, hash_leaf, hash_many_leaves, num_nodes, Hash, Path, Proof, TreeRef,
+    TreeRefMut,
 };
 
 /// Implementation of a merkle forest
@@ -113,6 +115,68 @@ impl Forest {
         }
     }
 
+    /// Deletes the leaf corresponding to given proof from tree
+    pub fn delete<T: AsRef<[u8]>>(&mut self, proof: Proof<T>) -> bool {
+        match self.leaf_distribution.len() {
+            0 => false,
+            _ => {
+                // Find hash of rightmost leaf of rightmost tree in forest
+                let last_tree_ref = self.get_tree_ref_with_index(self.leaf_distribution.len() - 1);
+                let last_tree_height = last_tree_ref.height();
+                let index_of_leaf_to_swap = self.nodes() - last_tree_height - 1;
+                let hash_of_leaf_to_swap = self.forest[index_of_leaf_to_swap];
+
+                // Calculate number of leaves in tree of given proof
+                let leaves = proof.leaves();
+
+                // Find the index of tree with above height in leaf distribution
+                let index = self
+                    .leaf_distribution
+                    .binary_search_by(|p| p.cmp(&leaves).reverse());
+
+                match index {
+                    Err(_) => false,
+                    Ok(index) => {
+                        // Get mutable reference to tree with index
+                        let mut tree_ref_mut = self.get_tree_ref_mut_with_index(index);
+
+                        // Swap and return false if it was unsuccessful
+                        if !tree_ref_mut.swap(&proof, hash_of_leaf_to_swap) {
+                            false
+                        } else {
+                            // Split off rightmost `rightmost_tree_height + 1` nodes from tree
+                            let index_to_split_off = self.forest.len() - (last_tree_height + 1);
+                            let _ = self.forest.split_off(index_to_split_off);
+
+                            // Update leaf distribution
+                            let _ = self.leaf_distribution.pop();
+                            for i in (0..last_tree_height).rev() {
+                                self.leaf_distribution.push(
+                                    2usize.pow(
+                                        i.try_into().expect("Expected height to be in bounds"),
+                                    ),
+                                );
+                            }
+
+                            // Update leaves
+                            self.leaves -= 1;
+
+                            // Update path map
+                            self.path_map.insert(hash_of_leaf_to_swap, proof.path);
+                            self.path_map.remove(&hash_leaf(proof.leaf_value));
+
+                            for i in 0..last_tree_height {
+                                self.update_paths_for_index(self.leaf_distribution.len() - 1 - i);
+                            }
+
+                            true
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Insert hash in forest if it does not already exists and run compression
     fn insert_hash(&mut self, hash: Hash) {
         if !self.path_map.contains_key(&hash) {
@@ -123,6 +187,22 @@ impl Forest {
             self.compress();
             self.update_paths();
         }
+    }
+
+    fn get_tree_ref_mut_with_index(&mut self, index: usize) -> TreeRefMut<'_> {
+        // Calculate number of nodes before tree in forest
+        let nodes_before_tree = self
+            .leaf_distribution
+            .iter()
+            .take(index)
+            .map(|leaves| num_nodes(*leaves))
+            .sum();
+
+        // Calculate number of nodes in tree
+        let nodes_in_tree = num_nodes(self.leaf_distribution[index]);
+
+        // Return tree ref with size
+        TreeRefMut(&mut self.forest[nodes_before_tree..(nodes_before_tree + nodes_in_tree)])
     }
 
     fn get_tree_ref_with_index(&self, index: usize) -> TreeRef<'_> {
@@ -271,6 +351,42 @@ mod tests {
 
         let proof = forest.prove("hello7").expect("Expected a proof");
         assert_eq!(3, proof.height());
+        assert!(forest.verify(&proof));
+
+        assert!(forest.delete(proof));
+
+        assert_eq!(7, forest.leaves());
+        assert_eq!(11, forest.nodes());
+
+        assert_eq!(leaf_distribution(7), forest.leaf_distribution);
+        assert!(forest.prove("hello7").is_none());
+
+        let proof = forest.prove("hello0").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello1").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello2").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello3").expect("Expected a proof");
+        assert_eq!(2, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello4").expect("Expected a proof");
+        assert_eq!(1, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello5").expect("Expected a proof");
+        assert_eq!(1, proof.height());
+        assert!(forest.verify(&proof));
+
+        let proof = forest.prove("hello6").expect("Expected a proof");
+        assert_eq!(0, proof.height());
         assert!(forest.verify(&proof));
     }
 }

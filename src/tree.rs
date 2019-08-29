@@ -171,14 +171,11 @@ impl<'a> TreeRefMut<'a> {
 
     /// Swaps the leaf represented by proof with given leaf value. Returns true if the swap was successful, false
     /// otherwise.
-    pub fn swap<T: AsRef<[u8]>>(&mut self, proof: &Proof<T>, leaf_value: T) -> bool {
+    pub fn swap<T: AsRef<[u8]>>(&mut self, proof: &Proof<T>, mut leaf_hash: Hash) -> bool {
         // Verify the proof
         if !proof.verify(self.root_hash()) {
             return false;
         }
-
-        // Compute new leaf hash
-        let mut leaf_hash = hash_leaf(leaf_value);
 
         // Compute all the new hashes along the path of proof by combining with sibling hash and new leaf hash from
         // bottom to top
@@ -394,7 +391,7 @@ mod tests {
         leaf_proof.verify(tree.root_hash());
 
         let mut tree = TreeRefMut(&mut nodes);
-        assert!(tree.swap(&leaf_proof, "hello8"));
+        assert!(tree.swap(&leaf_proof, hash_leaf("hello8")));
 
         let tree = TreeRef(&nodes);
 
