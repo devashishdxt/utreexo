@@ -7,7 +7,7 @@ pub const HASH_SIZE: usize = 32;
 /// Represents a hash value
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct Hash([u8; HASH_SIZE]);
+pub struct Hash(pub(crate) [u8; HASH_SIZE]);
 
 impl From<[u8; HASH_SIZE]> for Hash {
     #[inline]

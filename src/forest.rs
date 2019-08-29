@@ -179,8 +179,13 @@ impl Forest {
     ///
     /// This function should be called after each (insertion + compression) operation
     fn update_paths(&mut self) {
-        // Get tree ref of last tree
-        let tree_ref = self.get_tree_ref_with_index(self.leaf_distribution.len() - 1);
+        self.update_paths_for_index(self.leaf_distribution.len() - 1);
+    }
+
+    /// Updates path for all the leaves for tree with given index
+    fn update_paths_for_index(&mut self, index: usize) {
+        // Get tree ref of index
+        let tree_ref = self.get_tree_ref_with_index(index);
 
         // Get leaf hashes and leaf paths
         let leaf_hashes = tree_ref.leaf_hashes();
@@ -259,5 +264,13 @@ mod tests {
         assert_eq!(leaf_distribution(7), forest.leaf_distribution);
 
         assert!(forest.prove("hello7").is_none());
+
+        forest.insert("hello7");
+        assert_eq!(8, forest.leaves());
+        assert_eq!(15, forest.nodes());
+
+        let proof = forest.prove("hello7").expect("Expected a proof");
+        assert_eq!(3, proof.height());
+        assert!(forest.verify(&proof));
     }
 }

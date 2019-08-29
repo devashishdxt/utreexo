@@ -12,7 +12,7 @@ mod proof;
 mod tree;
 
 pub(crate) use self::path::{Direction, Path};
-pub(crate) use self::tree::TreeRef;
+pub(crate) use self::tree::{TreeRef, TreeRefMut};
 
 pub use self::forest::Forest;
 pub use self::hash::Hash;
