@@ -5,18 +5,16 @@
 //! # Utreexo
 extern crate alloc;
 
-mod forest;
 mod hash;
 mod path;
 mod proof;
-mod tree;
+mod utreexo;
 
 pub(crate) use self::path::{Direction, Path};
-pub(crate) use self::tree::{TreeRef, TreeRefMut};
 
-pub use self::forest::Forest;
 pub use self::hash::Hash;
 pub use self::proof::Proof;
+pub use self::utreexo::Utreexo;
 
 use alloc::{vec, vec::Vec};
 use core::{
