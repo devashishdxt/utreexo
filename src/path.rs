@@ -5,9 +5,12 @@ use core::{
 };
 
 use bit_vec::{BitVec, Iter};
+#[cfg(feature = "serde-1")]
+use serde::{Deserialize, Serialize};
 
 /// Represents path in a merkle proof (direction of path is from leaf to root)
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde-1", derive(Serialize, Deserialize))]
 pub struct Path(pub(crate) BitVec);
 
 impl Path {

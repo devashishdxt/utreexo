@@ -1,11 +1,13 @@
 use alloc::vec::Vec;
 
-use blake3::Hash;
+#[cfg(feature = "serde-1")]
+use serde::{Deserialize, Serialize};
 
-use crate::{hash_intermediate, Direction, Path};
+use crate::{hash_intermediate, Direction, Hash, Path};
 
 /// Inclusion proof of a value in a merkle forest
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde-1", derive(Serialize, Deserialize))]
 pub struct Proof {
     /// Path is from leaf to root node
     pub(crate) path: Path,

@@ -1,11 +1,13 @@
 use alloc::vec::Vec;
 
-use blake3::Hash;
+#[cfg(feature = "serde-1")]
+use serde::{Deserialize, Serialize};
 
-use crate::{merge, Direction, Proof, Prover, Tree, Utreexo};
+use crate::{merge, Direction, Hash, Proof, Prover, Tree, Utreexo};
 
 /// Merkle forest
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde-1", derive(Serialize, Deserialize))]
 pub struct MemoryForest(Vec<Option<Tree>>);
 
 impl MemoryForest {

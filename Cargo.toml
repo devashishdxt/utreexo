@@ -16,7 +16,17 @@ edition = "2018"
 bit-vec = { version = "0.6", default-features = false }
 blake3 = { version = "0.3", default-features = false }
 indexmap = "1.4"
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[dev-dependencies]
+criterion = "0.3"
+rand = "0.7"
 
 [features]
 default = []
+serde-1 = ["serde", "bit-vec/serde_no_std", "indexmap/serde-1"]
 std = ["blake3/std", "bit-vec/std"]
+
+[[bench]]
+name = "utreexo"
+harness = false

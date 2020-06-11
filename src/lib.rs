@@ -7,6 +7,7 @@ extern crate alloc;
 
 mod accumulator;
 mod forest;
+mod hash;
 mod path;
 mod proof;
 mod prover;
@@ -19,10 +20,9 @@ pub(crate) use self::{
 };
 
 pub use self::{
-    accumulator::MemoryAccumulator, forest::MemoryForest, proof::Proof, prover::Prover,
+    accumulator::MemoryAccumulator, forest::MemoryForest, hash::Hash, proof::Proof, prover::Prover,
     utreexo::Utreexo,
 };
-pub use blake3::Hash;
 
 use blake3::Hasher;
 
@@ -35,7 +35,7 @@ pub fn hash_leaf(value: impl AsRef<[u8]>) -> Hash {
     hasher.update(&[0]);
     hasher.update(value.as_ref());
 
-    hasher.finalize()
+    hasher.finalize().into()
 }
 
 /// Calculates intermediate hash of two values
@@ -48,5 +48,5 @@ pub(crate) fn hash_intermediate(left: &Hash, right: &Hash) -> Hash {
     hasher.update(left.as_bytes());
     hasher.update(right.as_bytes());
 
-    hasher.finalize()
+    hasher.finalize().into()
 }

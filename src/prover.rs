@@ -1,6 +1,4 @@
-use blake3::Hash;
-
-use crate::Proof;
+use crate::{Hash, Proof};
 
 /// Trait for generating inclusion proofs of value in merkle forest
 pub trait Prover {

@@ -1,11 +1,13 @@
 use alloc::vec::Vec;
 
-use blake3::Hash;
+#[cfg(feature = "serde-1")]
+use serde::{Deserialize, Serialize};
 
-use crate::{hash_intermediate, Proof, Utreexo};
+use crate::{hash_intermediate, Hash, Proof, Utreexo};
 
 /// Hash based in-memory accumulator
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde-1", derive(Serialize, Deserialize))]
 pub struct MemoryAccumulator(Vec<Option<Hash>>);
 
 impl MemoryAccumulator {

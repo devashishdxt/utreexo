@@ -1,10 +1,11 @@
 use alloc::{vec, vec::Vec};
 use core::convert::TryInto;
 
-use blake3::Hash;
 use indexmap::{indexset, IndexSet};
+#[cfg(feature = "serde-1")]
+use serde::{Deserialize, Serialize};
 
-use crate::{hash_intermediate, Direction, Path, Proof};
+use crate::{hash_intermediate, Direction, Hash, Path, Proof};
 
 /// Merkle tree
 //
@@ -28,6 +29,7 @@ use crate::{hash_intermediate, Direction, Path, Proof};
 //
 // In addition to all the nodes, tree also contains an ordered set of all the leaves
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde-1", derive(Serialize, Deserialize))]
 pub struct Tree {
     /// Nodes in tree
     nodes: Vec<Hash>,

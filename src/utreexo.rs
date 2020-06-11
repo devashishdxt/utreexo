@@ -1,6 +1,4 @@
-use blake3::Hash;
-
-use crate::Proof;
+use crate::{Hash, Proof};
 
 /// Trait for all the operations of Utreexo accumulator
 pub trait Utreexo {
