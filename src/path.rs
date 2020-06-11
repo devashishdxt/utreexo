@@ -107,3 +107,46 @@ impl<'a> DoubleEndedIterator for Directions<'a> {
         self.0.next_back().map(Into::into)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_path_height() {
+        let path = Path(BitVec::from_elem(3, false));
+        assert_eq!(3, path.height());
+    }
+
+    #[test]
+    fn check_path_directions() {
+        let path = Path(BitVec::from_elem(3, false));
+
+        let mut directions = path.directions();
+
+        assert_eq!(Some(Direction::Right), directions.next());
+        assert_eq!(Some(Direction::Right), directions.next());
+        assert_eq!(Some(Direction::Right), directions.next());
+        assert_eq!(None, directions.next());
+    }
+
+    #[test]
+    fn check_path_for_height_and_num() {
+        let path = Path::for_height_and_num(3, 4);
+
+        let mut directions = path.directions();
+
+        assert_eq!(Some(Direction::Right), directions.next());
+        assert_eq!(Some(Direction::Right), directions.next());
+        assert_eq!(Some(Direction::Left), directions.next());
+        assert_eq!(None, directions.next());
+    }
+
+    #[test]
+    fn check_direction_conversions() {
+        assert_eq!(Direction::Right, !Direction::Left);
+        assert_eq!(Direction::Left, !Direction::Right);
+        assert_eq!(Direction::Right, false.into());
+        assert_eq!(Direction::Left, true.into());
+    }
+}

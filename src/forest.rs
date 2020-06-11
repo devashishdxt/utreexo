@@ -5,10 +5,20 @@ use blake3::Hash;
 use crate::{merge, Direction, Proof, Prover, Tree, Utreexo};
 
 /// Merkle forest
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MemoryForest(Vec<Option<Tree>>);
 
 impl MemoryForest {
+    /// Creates a new instance of memory forest
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Returns all the trees in merkle forest
+    pub fn trees(&self) -> &[Option<Tree>] {
+        &self.0
+    }
+
     /// Verifies inclusion proof of a value in forest
     fn verify(&self, proof: &Proof) -> bool {
         let height = proof.path.height();
@@ -135,5 +145,94 @@ impl Utreexo for MemoryForest {
 
         self.0[height] = new_tree;
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_memory_forest_ops() {
+        let mut forest = MemoryForest::new();
+
+        forest.insert([0; 32].into());
+        forest.insert([1; 32].into());
+        forest.insert([2; 32].into());
+        forest.insert([3; 32].into());
+        forest.insert([4; 32].into());
+        forest.insert([5; 32].into());
+        forest.insert([6; 32].into());
+        forest.insert([7; 32].into());
+        forest.insert([8; 32].into());
+        forest.insert([9; 32].into());
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, forest.0.len());
+        assert!(forest.0[0].is_none());
+        assert!(forest.0[1].is_some());
+        assert!(forest.0[2].is_none());
+        assert!(forest.0[3].is_some());
+
+        // Delete a leaf
+        let proof = forest.prove(&[0; 32].into());
+        assert!(proof.is_some());
+        assert!(forest.delete(&proof.unwrap()));
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, forest.0.len());
+        assert!(forest.0[0].is_some());
+        assert!(forest.0[1].is_none());
+        assert!(forest.0[2].is_none());
+        assert!(forest.0[3].is_some());
+
+        // Delete a leaf
+        let proof = forest.prove(&[1; 32].into());
+        assert!(proof.is_some());
+        assert!(forest.delete(&proof.unwrap()));
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, forest.0.len());
+        assert!(forest.0[0].is_none());
+        assert!(forest.0[1].is_none());
+        assert!(forest.0[2].is_none());
+        assert!(forest.0[3].is_some());
+
+        // Delete a leaf
+        let proof = forest.prove(&[2; 32].into());
+        assert!(proof.is_some());
+        assert!(forest.delete(&proof.unwrap()));
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, forest.0.len());
+        assert!(forest.0[0].is_some());
+        assert!(forest.0[1].is_some());
+        assert!(forest.0[2].is_some());
+        assert!(forest.0[3].is_none());
+
+        // Delete a leaf
+        let proof = forest.prove(&[3; 32].into());
+        assert!(proof.is_some());
+        assert!(forest.delete(&proof.unwrap()));
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, forest.0.len());
+        assert!(forest.0[0].is_none());
+        assert!(forest.0[1].is_some());
+        assert!(forest.0[2].is_some());
+        assert!(forest.0[3].is_none());
+
+        // Add a leaf
+        forest.insert([0; 32].into());
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, forest.0.len());
+        assert!(forest.0[0].is_some());
+        assert!(forest.0[1].is_some());
+        assert!(forest.0[2].is_some());
+        assert!(forest.0[3].is_none());
+
+        // Check proof of a value not present in the set
+        assert!(forest.prove(&[1; 32].into()).is_none());
     }
 }

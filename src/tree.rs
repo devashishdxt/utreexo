@@ -29,7 +29,9 @@ use crate::{hash_intermediate, Direction, Path, Proof};
 // In addition to all the nodes, tree also contains an ordered set of all the leaves
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tree {
+    /// Nodes in tree
     nodes: Vec<Hash>,
+    /// Leaves of the tree (this is only present to increase the efficiency of proof generation)
     leaves: IndexSet<Hash>,
 }
 
@@ -43,13 +45,13 @@ impl Tree {
     }
 
     /// Returns the number of leaves in the tree
-    pub fn leaves(&self) -> usize {
+    pub fn num_leaves(&self) -> usize {
         self.leaves.len()
     }
 
     /// Returns height of the tree
     pub fn height(&self) -> usize {
-        let num_leaves = self.leaves();
+        let num_leaves = self.num_leaves();
 
         num_leaves
             .trailing_zeros()
@@ -106,7 +108,7 @@ impl Tree {
     /// Splits a tree and returns both subtrees. If there is only one node in the tree, the right
     /// subtree will be returned as `None`.
     pub fn split(&self) -> (Self, Option<Self>) {
-        if self.leaves() == 1 {
+        if self.num_leaves() == 1 {
             return (self.clone(), None);
         }
 
@@ -123,11 +125,11 @@ impl Tree {
 
         // Next, we split leaves into two equal parts
         assert!(
-            self.leaves() % 2 == 0,
+            self.num_leaves() % 2 == 0,
             "Merkle tree should contain even number of leaves."
         );
 
-        let leaves_to_take = self.leaves() / 2;
+        let leaves_to_take = self.num_leaves() / 2;
 
         let mut leaves_iter = self.leaves.clone().into_iter();
 
@@ -172,12 +174,119 @@ pub fn merge(left: &Tree, right: &Tree) -> Tree {
     new_nodes.push(new_root_hash);
 
     // Next, we merge leaves
-    let mut new_leaves = IndexSet::with_capacity(left.leaves() + right.leaves());
+    let mut new_leaves = IndexSet::with_capacity(left.num_leaves() + right.num_leaves());
     new_leaves.extend(left.leaves.iter());
     new_leaves.extend(right.leaves.iter());
 
     Tree {
         nodes: new_nodes,
         leaves: new_leaves,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_tree_new() {
+        let leaf_hash = [0; 32].into();
+
+        let tree = Tree::new(leaf_hash);
+
+        assert_eq!(0, tree.height());
+        assert_eq!(1, tree.num_leaves());
+    }
+
+    #[test]
+    fn check_tree_merge() {
+        let left_leaf_hash = [0; 32].into();
+        let right_leaf_hash = [1; 32].into();
+
+        let left_tree = Tree::new(left_leaf_hash);
+        let right_tree = Tree::new(right_leaf_hash);
+
+        let tree = merge(&left_tree, &right_tree);
+        let root_hash = hash_intermediate(&left_leaf_hash, &right_leaf_hash);
+
+        assert_eq!(1, tree.height());
+        assert_eq!(2, tree.num_leaves());
+
+        assert_eq!(&root_hash, tree.root_hash());
+    }
+
+    #[test]
+    fn check_tree_split() {
+        let left_leaf_hash = [0; 32].into();
+        let right_leaf_hash = [1; 32].into();
+
+        let left_tree = Tree::new(left_leaf_hash);
+        let right_tree = Tree::new(right_leaf_hash);
+
+        let tree = merge(&left_tree, &right_tree);
+
+        let (new_left_tree, new_right_tree) = tree.split();
+
+        assert_eq!(new_left_tree, left_tree);
+        assert!(new_right_tree.is_some());
+        assert_eq!(new_right_tree.unwrap(), right_tree);
+
+        assert_eq!(new_left_tree.num_leaves(), 1);
+        assert_eq!(new_left_tree.height(), 0);
+
+        let (_, more_split) = new_left_tree.split();
+        assert!(more_split.is_none());
+    }
+
+    #[test]
+    fn check_tree_prove() {
+        let leaf_1 = Tree::new([0; 32].into());
+        let leaf_2 = Tree::new([1; 32].into());
+        let leaf_3 = Tree::new([2; 32].into());
+        let leaf_4 = Tree::new([3; 32].into());
+        let leaf_5 = Tree::new([4; 32].into());
+        let leaf_6 = Tree::new([5; 32].into());
+        let leaf_7 = Tree::new([6; 32].into());
+        let leaf_8 = Tree::new([7; 32].into());
+
+        let tree = merge(
+            &merge(&merge(&leaf_1, &leaf_2), &merge(&leaf_3, &leaf_4)),
+            &merge(&merge(&leaf_5, &leaf_6), &merge(&leaf_7, &leaf_8)),
+        );
+
+        let proof = tree.prove(&[0; 32].into());
+        assert!(proof.is_some());
+        assert!(proof.unwrap().verify(*tree.root_hash()));
+
+        let proof = tree.prove(&[1; 32].into());
+        assert!(proof.is_some());
+        assert!(proof.unwrap().verify(*tree.root_hash()));
+
+        let proof = tree.prove(&[2; 32].into());
+        assert!(proof.is_some());
+        assert!(proof.unwrap().verify(*tree.root_hash()));
+
+        let proof = tree.prove(&[3; 32].into());
+        assert!(proof.is_some());
+        assert!(proof.unwrap().verify(*tree.root_hash()));
+
+        let proof = tree.prove(&[4; 32].into());
+        assert!(proof.is_some());
+        assert!(proof.unwrap().verify(*tree.root_hash()));
+
+        let proof = tree.prove(&[5; 32].into());
+        assert!(proof.is_some());
+        assert!(proof.unwrap().verify(*tree.root_hash()));
+
+        let proof = tree.prove(&[6; 32].into());
+        assert!(proof.is_some());
+        assert!(proof.unwrap().verify(*tree.root_hash()));
+
+        let proof = tree.prove(&[7; 32].into());
+        assert!(proof.is_some());
+        assert!(proof.unwrap().verify(*tree.root_hash()));
+
+        let proof = tree.prove(&[8; 32].into());
+        assert!(proof.is_none());
     }
 }

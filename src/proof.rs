@@ -49,3 +49,28 @@ impl Proof {
         hash == root_hash
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_proof_verify() {
+        let path = Path::for_height_and_num(3, 5);
+        let sibling_hashes = vec![[0; 32].into(), [1; 32].into(), [2; 32].into()];
+        let leaf_hash = [0; 32].into();
+
+        let intermediate_hash_1 = hash_intermediate(&sibling_hashes[0], &leaf_hash);
+        let intermediate_hash_2 = hash_intermediate(&intermediate_hash_1, &sibling_hashes[1]);
+        let root_hash = hash_intermediate(&sibling_hashes[2], &intermediate_hash_2);
+
+        let proof = Proof {
+            path,
+            leaf_hash,
+            sibling_hashes,
+        };
+
+        assert!(proof.verify(root_hash));
+        assert!(!proof.verify(intermediate_hash_2));
+    }
+}

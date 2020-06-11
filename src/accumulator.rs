@@ -5,10 +5,20 @@ use blake3::Hash;
 use crate::{hash_intermediate, Proof, Utreexo};
 
 /// Hash based in-memory accumulator
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct MemoryAccumulator(Vec<Option<Hash>>);
 
 impl MemoryAccumulator {
+    /// Creates a new instance of memory accumulator
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Returns the root hashes of all the merkle trees in forest
+    pub fn root_hashes(&self) -> &[Option<Hash>] {
+        &self.0
+    }
+
     /// Verifies inclusion proof of a value in accumulator
     fn verify(&self, proof: &Proof) -> bool {
         let height = proof.path.height();
@@ -72,14 +82,143 @@ impl Utreexo for MemoryAccumulator {
             }
         }
 
-        if let Some(new_hash) = new_hash {
-            if self.0.len() == height {
-                self.0.push(Some(new_hash))
-            } else {
-                self.0[height] = Some(new_hash)
+        self.0[height] = new_hash;
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // To test accumulator, we need forest to generate incusion proofs
+
+    use super::*;
+    use crate::{MemoryForest, Prover};
+
+    #[test]
+    fn check_accumulator_ops() {
+        let mut accumulator = MemoryAccumulator::new();
+        let mut forest = MemoryForest::new();
+
+        forest.insert([0; 32].into());
+        forest.insert([1; 32].into());
+        forest.insert([2; 32].into());
+        forest.insert([3; 32].into());
+        forest.insert([4; 32].into());
+        forest.insert([5; 32].into());
+        forest.insert([6; 32].into());
+        forest.insert([7; 32].into());
+        forest.insert([8; 32].into());
+        forest.insert([9; 32].into());
+
+        accumulator.insert([0; 32].into());
+        accumulator.insert([1; 32].into());
+        accumulator.insert([2; 32].into());
+        accumulator.insert([3; 32].into());
+        accumulator.insert([4; 32].into());
+        accumulator.insert([5; 32].into());
+        accumulator.insert([6; 32].into());
+        accumulator.insert([7; 32].into());
+        accumulator.insert([8; 32].into());
+        accumulator.insert([9; 32].into());
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, accumulator.0.len());
+        assert!(accumulator.0[0].is_none());
+        assert!(accumulator.0[1].is_some());
+        assert!(accumulator.0[2].is_none());
+        assert!(accumulator.0[3].is_some());
+
+        // Delete a leaf
+        let proof = forest.prove(&[0; 32].into());
+        assert!(proof.is_some());
+        let proof = proof.unwrap();
+        assert!(forest.delete(&proof));
+        assert!(accumulator.delete(&proof));
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, accumulator.0.len());
+        assert!(accumulator.0[0].is_some());
+        assert!(accumulator.0[1].is_none());
+        assert!(accumulator.0[2].is_none());
+        assert!(accumulator.0[3].is_some());
+
+        // Delete a leaf
+        let proof = forest.prove(&[1; 32].into());
+        assert!(proof.is_some());
+        let proof = proof.unwrap();
+        assert!(forest.delete(&proof));
+        assert!(accumulator.delete(&proof));
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, accumulator.0.len());
+        assert!(accumulator.0[0].is_none());
+        assert!(accumulator.0[1].is_none());
+        assert!(accumulator.0[2].is_none());
+        assert!(accumulator.0[3].is_some());
+
+        // Delete a leaf
+        let proof = forest.prove(&[2; 32].into());
+        assert!(proof.is_some());
+        let proof = proof.unwrap();
+        assert!(forest.delete(&proof));
+        assert!(accumulator.delete(&proof));
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, accumulator.0.len());
+        assert!(accumulator.0[0].is_some());
+        assert!(accumulator.0[1].is_some());
+        assert!(accumulator.0[2].is_some());
+        assert!(accumulator.0[3].is_none());
+
+        // Delete a leaf
+        let proof = forest.prove(&[3; 32].into());
+        assert!(proof.is_some());
+        let proof = proof.unwrap();
+        assert!(forest.delete(&proof));
+        assert!(accumulator.delete(&proof));
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, accumulator.0.len());
+        assert!(accumulator.0[0].is_none());
+        assert!(accumulator.0[1].is_some());
+        assert!(accumulator.0[2].is_some());
+        assert!(accumulator.0[3].is_none());
+
+        // Add a leaf
+        forest.insert([0; 32].into());
+        accumulator.insert([0; 32].into());
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, accumulator.0.len());
+        assert!(accumulator.0[0].is_some());
+        assert!(accumulator.0[1].is_some());
+        assert!(accumulator.0[2].is_some());
+        assert!(accumulator.0[3].is_none());
+
+        // Delete a leaf
+        let proof = forest.prove(&[0; 32].into());
+        assert!(proof.is_some());
+        let proof = proof.unwrap();
+        assert!(forest.delete(&proof));
+        assert!(accumulator.delete(&proof));
+
+        // Checking distribution of trees in merkle forest
+        assert_eq!(4, accumulator.0.len());
+        assert!(accumulator.0[0].is_none());
+        assert!(accumulator.0[1].is_some());
+        assert!(accumulator.0[2].is_some());
+        assert!(accumulator.0[3].is_none());
+
+        // Checking all the root hashes of trees in merkle forest and accumulator
+        for (hash, tree) in accumulator.root_hashes().iter().zip(forest.trees().iter()) {
+            match hash {
+                None => assert!(tree.is_none()),
+                Some(ref hash) => {
+                    assert!(tree.is_some());
+                    let tree_hash = tree.as_ref().unwrap().root_hash();
+                    assert_eq!(hash, tree_hash);
+                }
             }
         }
-
-        true
     }
 }
