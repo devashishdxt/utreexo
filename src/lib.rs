@@ -15,12 +15,13 @@ mod tree;
 mod utreexo;
 
 pub(crate) use self::{
+    hash::Hash,
     path::{Direction, Path},
     tree::{merge, Tree},
 };
 
 pub use self::{
-    accumulator::MemoryAccumulator, forest::MemoryForest, hash::Hash, proof::Proof, prover::Prover,
+    accumulator::MemoryAccumulator, forest::MemoryForest, proof::Proof, prover::Prover,
     utreexo::Utreexo,
 };
 
