@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "serde-1")]
 use serde::{Deserialize, Serialize};
 
-use crate::{merge, Direction, Hash, Proof, Prover, Tree, Utreexo};
+use crate::{hash_leaf, merge, Direction, Proof, Prover, Tree, Utreexo};
 
 /// Merkle forest
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
@@ -82,10 +82,12 @@ impl MemoryForest {
 }
 
 impl Prover for MemoryForest {
-    fn prove(&self, leaf_hash: &Hash) -> Option<Proof> {
+    fn prove<T: AsRef<[u8]>>(&self, leaf_value: T) -> Option<Proof> {
+        let leaf_hash = hash_leaf(leaf_value);
+
         for tree in self.0.iter() {
             if let Some(ref tree) = tree {
-                let proof = tree.prove(leaf_hash);
+                let proof = tree.prove(&leaf_hash);
 
                 if proof.is_some() {
                     return proof;
@@ -98,7 +100,8 @@ impl Prover for MemoryForest {
 }
 
 impl Utreexo for MemoryForest {
-    fn insert(&mut self, leaf_hash: Hash) {
+    fn insert<T: AsRef<[u8]>>(&mut self, leaf_value: T) {
+        let leaf_hash = hash_leaf(leaf_value);
         let mut new_tree = Tree::new(leaf_hash);
 
         for tree in self.0.iter_mut() {
@@ -158,16 +161,16 @@ mod tests {
     fn check_memory_forest_ops() {
         let mut forest = MemoryForest::new();
 
-        forest.insert([0; 32].into());
-        forest.insert([1; 32].into());
-        forest.insert([2; 32].into());
-        forest.insert([3; 32].into());
-        forest.insert([4; 32].into());
-        forest.insert([5; 32].into());
-        forest.insert([6; 32].into());
-        forest.insert([7; 32].into());
-        forest.insert([8; 32].into());
-        forest.insert([9; 32].into());
+        forest.insert([0; 32]);
+        forest.insert([1; 32]);
+        forest.insert([2; 32]);
+        forest.insert([3; 32]);
+        forest.insert([4; 32]);
+        forest.insert([5; 32]);
+        forest.insert([6; 32]);
+        forest.insert([7; 32]);
+        forest.insert([8; 32]);
+        forest.insert([9; 32]);
 
         // Checking distribution of trees in merkle forest
         assert_eq!(4, forest.0.len());
@@ -177,7 +180,7 @@ mod tests {
         assert!(forest.0[3].is_some());
 
         // Delete a leaf
-        let proof = forest.prove(&[0; 32].into());
+        let proof = forest.prove(&[0; 32]);
         assert!(proof.is_some());
         assert!(forest.delete(&proof.unwrap()));
 
@@ -189,7 +192,7 @@ mod tests {
         assert!(forest.0[3].is_some());
 
         // Delete a leaf
-        let proof = forest.prove(&[1; 32].into());
+        let proof = forest.prove(&[1; 32]);
         assert!(proof.is_some());
         assert!(forest.delete(&proof.unwrap()));
 
@@ -201,7 +204,7 @@ mod tests {
         assert!(forest.0[3].is_some());
 
         // Delete a leaf
-        let proof = forest.prove(&[2; 32].into());
+        let proof = forest.prove(&[2; 32]);
         assert!(proof.is_some());
         assert!(forest.delete(&proof.unwrap()));
 
@@ -213,7 +216,7 @@ mod tests {
         assert!(forest.0[3].is_none());
 
         // Delete a leaf
-        let proof = forest.prove(&[3; 32].into());
+        let proof = forest.prove(&[3; 32]);
         assert!(proof.is_some());
         assert!(forest.delete(&proof.unwrap()));
 
@@ -225,7 +228,7 @@ mod tests {
         assert!(forest.0[3].is_none());
 
         // Add a leaf
-        forest.insert([0; 32].into());
+        forest.insert([0; 32]);
 
         // Checking distribution of trees in merkle forest
         assert_eq!(4, forest.0.len());
@@ -235,6 +238,6 @@ mod tests {
         assert!(forest.0[3].is_none());
 
         // Check proof of a value not present in the set
-        assert!(forest.prove(&[1; 32].into()).is_none());
+        assert!(forest.prove(&[1; 32]).is_none());
     }
 }

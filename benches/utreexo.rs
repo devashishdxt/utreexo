@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use utreexo::{Hash, MemoryAccumulator, MemoryForest, Proof, Prover, Utreexo};
+use utreexo::{MemoryAccumulator, MemoryForest, Proof, Prover, Utreexo};
 
 const INITIAL_COUNT: usize = 10_000_000;
 
@@ -19,7 +19,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
 fn bench_accumulator_insert(c: &mut Criterion, mut accumulator: MemoryAccumulator) {
     let hash: [u8; 32] = rand::random();
-    let hash: Hash = hash.into();
 
     c.bench_function("accumulator insert", |b| {
         b.iter(|| {
@@ -42,7 +41,6 @@ fn bench_accumulator_delete(
 
 fn bench_forest_insert(c: &mut Criterion, mut forest: MemoryForest) {
     let hash: [u8; 32] = rand::random();
-    let hash: Hash = hash.into();
 
     c.bench_function("forest insert", |b| {
         b.iter(|| {
@@ -59,7 +57,7 @@ fn bench_forest_delete(c: &mut Criterion, mut forest: MemoryForest, proofs: &[Pr
     });
 }
 
-fn bench_forest_prove(c: &mut Criterion, forest: &MemoryForest, hashes: &[Hash]) {
+fn bench_forest_prove(c: &mut Criterion, forest: &MemoryForest, hashes: &[[u8; 32]]) {
     let mut hashes_iter = hashes.iter();
 
     c.bench_function("forest prove", |b| {
@@ -67,7 +65,7 @@ fn bench_forest_prove(c: &mut Criterion, forest: &MemoryForest, hashes: &[Hash])
     });
 }
 
-fn gen_hashes() -> Vec<Hash> {
+fn gen_hashes() -> Vec<[u8; 32]> {
     let mut hashes = Vec::with_capacity(INITIAL_COUNT);
 
     for _ in 0..INITIAL_COUNT {
@@ -78,7 +76,7 @@ fn gen_hashes() -> Vec<Hash> {
     hashes
 }
 
-fn gen_accumulator(hashes: &[Hash]) -> MemoryAccumulator {
+fn gen_accumulator(hashes: &[[u8; 32]]) -> MemoryAccumulator {
     let mut accumulator = MemoryAccumulator::new();
 
     for hash in hashes {
@@ -88,7 +86,7 @@ fn gen_accumulator(hashes: &[Hash]) -> MemoryAccumulator {
     accumulator
 }
 
-fn gen_forest(hashes: &[Hash]) -> MemoryForest {
+fn gen_forest(hashes: &[[u8; 32]]) -> MemoryForest {
     let mut forest = MemoryForest::new();
 
     for hash in hashes {
@@ -98,7 +96,7 @@ fn gen_forest(hashes: &[Hash]) -> MemoryForest {
     forest
 }
 
-fn gen_proofs(forest: &MemoryForest, hashes: &[Hash]) -> Vec<Proof> {
+fn gen_proofs(forest: &MemoryForest, hashes: &[[u8; 32]]) -> Vec<Proof> {
     let mut proofs = Vec::with_capacity(INITIAL_COUNT);
 
     for hash in hashes {

@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "serde-1")]
 use serde::{Deserialize, Serialize};
 
-use crate::{hash_intermediate, Hash, Proof, Utreexo};
+use crate::{hash_intermediate, hash_leaf, Hash, Proof, Utreexo};
 
 /// Hash based in-memory accumulator
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
@@ -38,8 +38,8 @@ impl MemoryAccumulator {
 }
 
 impl Utreexo for MemoryAccumulator {
-    fn insert(&mut self, leaf_hash: Hash) {
-        let mut new_hash = leaf_hash;
+    fn insert<T: AsRef<[u8]>>(&mut self, leaf_value: T) {
+        let mut new_hash = hash_leaf(leaf_value);
 
         for hash in self.0.iter_mut() {
             match hash {
@@ -101,27 +101,27 @@ mod tests {
         let mut accumulator = MemoryAccumulator::new();
         let mut forest = MemoryForest::new();
 
-        forest.insert([0; 32].into());
-        forest.insert([1; 32].into());
-        forest.insert([2; 32].into());
-        forest.insert([3; 32].into());
-        forest.insert([4; 32].into());
-        forest.insert([5; 32].into());
-        forest.insert([6; 32].into());
-        forest.insert([7; 32].into());
-        forest.insert([8; 32].into());
-        forest.insert([9; 32].into());
+        forest.insert([0; 32]);
+        forest.insert([1; 32]);
+        forest.insert([2; 32]);
+        forest.insert([3; 32]);
+        forest.insert([4; 32]);
+        forest.insert([5; 32]);
+        forest.insert([6; 32]);
+        forest.insert([7; 32]);
+        forest.insert([8; 32]);
+        forest.insert([9; 32]);
 
-        accumulator.insert([0; 32].into());
-        accumulator.insert([1; 32].into());
-        accumulator.insert([2; 32].into());
-        accumulator.insert([3; 32].into());
-        accumulator.insert([4; 32].into());
-        accumulator.insert([5; 32].into());
-        accumulator.insert([6; 32].into());
-        accumulator.insert([7; 32].into());
-        accumulator.insert([8; 32].into());
-        accumulator.insert([9; 32].into());
+        accumulator.insert([0; 32]);
+        accumulator.insert([1; 32]);
+        accumulator.insert([2; 32]);
+        accumulator.insert([3; 32]);
+        accumulator.insert([4; 32]);
+        accumulator.insert([5; 32]);
+        accumulator.insert([6; 32]);
+        accumulator.insert([7; 32]);
+        accumulator.insert([8; 32]);
+        accumulator.insert([9; 32]);
 
         // Checking distribution of trees in merkle forest
         assert_eq!(4, accumulator.0.len());
@@ -131,7 +131,7 @@ mod tests {
         assert!(accumulator.0[3].is_some());
 
         // Delete a leaf
-        let proof = forest.prove(&[0; 32].into());
+        let proof = forest.prove(&[0; 32]);
         assert!(proof.is_some());
         let proof = proof.unwrap();
         assert!(forest.delete(&proof));
@@ -145,7 +145,7 @@ mod tests {
         assert!(accumulator.0[3].is_some());
 
         // Delete a leaf
-        let proof = forest.prove(&[1; 32].into());
+        let proof = forest.prove(&[1; 32]);
         assert!(proof.is_some());
         let proof = proof.unwrap();
         assert!(forest.delete(&proof));
@@ -159,7 +159,7 @@ mod tests {
         assert!(accumulator.0[3].is_some());
 
         // Delete a leaf
-        let proof = forest.prove(&[2; 32].into());
+        let proof = forest.prove(&[2; 32]);
         assert!(proof.is_some());
         let proof = proof.unwrap();
         assert!(forest.delete(&proof));
@@ -173,7 +173,7 @@ mod tests {
         assert!(accumulator.0[3].is_none());
 
         // Delete a leaf
-        let proof = forest.prove(&[3; 32].into());
+        let proof = forest.prove(&[3; 32]);
         assert!(proof.is_some());
         let proof = proof.unwrap();
         assert!(forest.delete(&proof));
@@ -187,8 +187,8 @@ mod tests {
         assert!(accumulator.0[3].is_none());
 
         // Add a leaf
-        forest.insert([0; 32].into());
-        accumulator.insert([0; 32].into());
+        forest.insert([0; 32]);
+        accumulator.insert([0; 32]);
 
         // Checking distribution of trees in merkle forest
         assert_eq!(4, accumulator.0.len());
@@ -198,7 +198,7 @@ mod tests {
         assert!(accumulator.0[3].is_none());
 
         // Delete a leaf
-        let proof = forest.prove(&[0; 32].into());
+        let proof = forest.prove(&[0; 32]);
         assert!(proof.is_some());
         let proof = proof.unwrap();
         assert!(forest.delete(&proof));
