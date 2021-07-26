@@ -14,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 bit-vec = { version = "0.6", default-features = false }
-blake3 = { version = "0.3", default-features = false }
+blake3 = { version = "1.0", default-features = false }
 indexmap = "1.4"
 serde = { version = "1.0", features = ["derive"], optional = true }
 
